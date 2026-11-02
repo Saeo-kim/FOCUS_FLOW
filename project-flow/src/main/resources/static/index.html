@@ -1,0 +1,572 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOCUS FLOW</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #10131a;
+            color: #f3f4f6;
+            font-family: Arial, sans-serif;
+        }
+
+        .layout {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 36px 24px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 36px;
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+
+        .logo span {
+            color: #a78bfa;
+        }
+
+        .date {
+            color: #9ca3af;
+            font-size: 13px;
+        }
+
+        .welcome {
+            margin-bottom: 28px;
+        }
+
+        .eyebrow {
+            color: #a78bfa;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        h1 {
+            font-size: clamp(28px, 5vw, 42px);
+            margin: 12px 0;
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            line-height: 1.7;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 18px;
+        }
+
+        .card {
+            background: #191e29;
+            border: 1px solid #2b3241;
+            border-radius: 18px;
+            padding: 24px;
+            min-width: 0;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            margin: 0 0 20px;
+        }
+
+        .focus-card {
+            background: linear-gradient(145deg, #292344, #191e29 75%);
+        }
+
+        .focus-task {
+            font-size: 25px;
+            font-weight: bold;
+            line-height: 1.4;
+            margin: 18px 0 10px;
+        }
+
+        .muted {
+            color: #a4a9b7;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .tag {
+            display: inline-block;
+            color: #c4b5fd;
+            background: #393052;
+            border-radius: 20px;
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+
+        button, input {
+            font: inherit;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .primary {
+            margin-top: 22px;
+            border: 0;
+            background: #a78bfa;
+            color: #171322;
+            font-weight: bold;
+            padding: 12px 16px;
+            border-radius: 10px;
+        }
+
+        .primary:hover {
+            background: #c4b5fd;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .stat {
+            background: #191e29;
+            border: 1px solid #2b3241;
+            padding: 20px;
+            border-radius: 16px;
+        }
+
+        .stat-number {
+            font-size: 29px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .section-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .task {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #202634;
+            padding: 14px;
+            border-radius: 12px;
+        }
+
+        .task input[type="checkbox"] {
+            width: 17px;
+            height: 17px;
+            accent-color: #a78bfa;
+            flex-shrink: 0;
+        }
+
+        .task-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-name {
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .task.done .task-name {
+            text-decoration: line-through;
+            color: #858b99;
+        }
+
+        .priority {
+            font-size: 10px;
+            color: #fbbf24;
+            margin-top: 6px;
+        }
+
+        .priority.high {
+            color: #fb7185;
+        }
+
+        .priority.low {
+            color: #9ca3af;
+        }
+
+        .delete {
+            background: transparent;
+            border: 0;
+            color: #8b93a5;
+            font-size: 18px;
+            padding: 4px 8px;
+        }
+
+        .delete:hover {
+            color: #fb7185;
+        }
+
+        .add-form {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .add-form input {
+            min-width: 0;
+            flex: 1;
+            background: #10131a;
+            color: white;
+            border: 1px solid #363e50;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .add-form button {
+            background: #292344;
+            color: #c4b5fd;
+            border: 1px solid #51416f;
+            border-radius: 10px;
+            padding: 0 16px;
+        }
+
+        .progress-track {
+            height: 8px;
+            border-radius: 10px;
+            background: #34394a;
+            overflow: hidden;
+            margin: 18px 0 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #a78bfa;
+            transition: width 0.2s;
+        }
+
+        .progress-caption {
+            display: flex;
+            justify-content: space-between;
+            color: #a4a9b7;
+            font-size: 12px;
+        }
+
+        .tasks-card {
+            margin-top: 18px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #747b8d;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 700px) {
+            .layout {
+                padding: 24px 16px;
+            }
+
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="layout">
+
+    <header>
+        <div class="logo">FOCUS <span>FLOW.</span></div>
+        <div class="date" id="today"></div>
+    </header>
+
+    <section class="welcome">
+        <div class="eyebrow">YOUR PERSONAL WORKSPACE</div>
+        <h1>Make room for<br>what matters.</h1>
+        <p class="subtitle">
+            모든 일을 한꺼번에 하지 않아도 돼.<br>
+            지금 중요한 일부터 하나씩 완성하자.
+        </p>
+    </section>
+
+    <section class="dashboard">
+
+        <div class="card focus-card">
+            <div class="eyebrow">NEXT BEST ACTION</div>
+            <div class="focus-task" id="nextTask">프로젝트 기획 정리하기</div>
+            <p class="muted" id="nextDescription">
+                가장 중요한 작업부터 시작해 보세요.
+            </p>
+            <span class="tag" id="nextTag">HIGH PRIORITY</span>
+            <br>
+            <button class="primary" id="focusButton">
+                이 작업 완료하기 →
+            </button>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>Today's Progress</h2>
+                <div class="progress-caption">
+                    <span>Completed Tasks</span>
+                    <span id="progressText">0 / 4</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <p class="muted" id="progressMessage">
+                    작은 시작도 진행 상황이야.
+                </p>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number" id="remainingCount">4</div>
+                    <div class="stat-label">REMAINING TASKS</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="completedCount">0</div>
+                    <div class="stat-label">COMPLETED</div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <section class="card tasks-card">
+        <div class="section-heading">
+            <h2>Priority Ranking</h2>
+            <span class="tag">MY TASKS</span>
+        </div>
+
+        <div class="task-list" id="taskList"></div>
+
+        <form class="add-form" id="addForm">
+            <input
+                    id="taskInput"
+                    type="text"
+                    placeholder="새로운 작업 입력하기..."
+                    maxlength="100"
+                    required
+            >
+            <button type="submit">+ 추가</button>
+        </form>
+    </section>
+
+    <footer>FOCUS ON WHAT MATTERS · FOCUS FLOW</footer>
+
+</div>
+
+<script>
+    let tasks = [
+        {
+            id: 1,
+            name: "FOCUS FLOW 첫 화면 완성하기",
+            priority: "HIGH",
+            done: false
+        },
+        {
+            id: 2,
+            name: "프로젝트 기능 목록 정리하기",
+            priority: "HIGH",
+            done: false
+        },
+        {
+            id: 3,
+            name: "Spring Boot 실행 과정 확인하기",
+            priority: "MEDIUM",
+            done: false
+        },
+        {
+            id: 4,
+            name: "오늘 배운 내용 기록하기",
+            priority: "LOW",
+            done: false
+        }
+    ];
+
+    const taskList = document.getElementById("taskList");
+
+    document.getElementById("today").textContent =
+        new Date().toLocaleDateString("ko-KR", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            weekday: "long"
+        });
+
+    function render() {
+        taskList.innerHTML = "";
+
+        const priorityOrder = {
+            HIGH: 1,
+            MEDIUM: 2,
+            LOW: 3
+        };
+
+        const sortedTasks = [...tasks].sort((a, b) => {
+            if (a.done !== b.done) {
+                return Number(a.done) - Number(b.done);
+            }
+            return priorityOrder[a.priority] - priorityOrder[b.priority];
+        });
+
+        sortedTasks.forEach(task => {
+            const row = document.createElement("div");
+            row.className = "task" + (task.done ? " done" : "");
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = task.done;
+            checkbox.setAttribute(
+                "aria-label",
+                task.name + " 완료 여부"
+            );
+
+            checkbox.addEventListener("change", () => {
+                task.done = checkbox.checked;
+                render();
+            });
+
+            const info = document.createElement("div");
+            info.className = "task-info";
+
+            const name = document.createElement("div");
+            name.className = "task-name";
+            name.textContent = task.name;
+
+            const priority = document.createElement("div");
+            priority.className = "priority";
+            priority.textContent = task.priority + " PRIORITY";
+
+            if (task.priority === "HIGH") {
+                priority.classList.add("high");
+            } else if (task.priority === "LOW") {
+                priority.classList.add("low");
+            }
+
+            info.append(name, priority);
+
+            const removeButton = document.createElement("button");
+            removeButton.className = "delete";
+            removeButton.type = "button";
+            removeButton.textContent = "×";
+            removeButton.setAttribute("aria-label", "작업 삭제");
+
+            removeButton.addEventListener("click", () => {
+                tasks = tasks.filter(item => item.id !== task.id);
+                render();
+            });
+
+            row.append(checkbox, info, removeButton);
+            taskList.appendChild(row);
+        });
+
+        const completed = tasks.filter(task => task.done).length;
+        const remaining = tasks.length - completed;
+        const percent = tasks.length === 0
+            ? 0
+            : Math.round(completed / tasks.length * 100);
+
+        document.getElementById("progressText").textContent =
+            `${completed} / ${tasks.length}`;
+
+        document.getElementById("progressBar").style.width =
+            percent + "%";
+
+        document.getElementById("remainingCount").textContent = remaining;
+        document.getElementById("completedCount").textContent = completed;
+
+        document.getElementById("progressMessage").textContent =
+            tasks.length === 0
+                ? "새로운 작업을 추가해 보세요."
+                : percent === 100
+                    ? "오늘 등록한 작업을 모두 완료했어!"
+                    : "Every little thing you finish moves you forward.";
+
+        const next = sortedTasks.find(task => !task.done);
+
+        document.getElementById("nextTask").textContent =
+            next ? next.name : "다음에 할 일을 추가해 보세요.";
+
+        document.getElementById("nextDescription").textContent =
+            next
+                ? "현재 미완료 작업 중 우선순위가 가장 높은 작업이야."
+                : "모든 작업을 완료했거나 새로운 작업이 필요해.";
+
+        document.getElementById("nextTag").textContent =
+            next ? next.priority + " PRIORITY" : "ALL CLEAR";
+
+        document.getElementById("focusButton").disabled = !next;
+        document.getElementById("focusButton").style.opacity =
+            next ? "1" : "0.5";
+
+        document.getElementById("focusButton").onclick = () => {
+            if (!next) return;
+
+            const target = tasks.find(task => task.id === next.id);
+            target.done = true;
+            render();
+        };
+    }
+
+    document.getElementById("addForm").addEventListener("submit", event => {
+        event.preventDefault();
+
+        const input = document.getElementById("taskInput");
+        const name = input.value.trim();
+
+        if (!name) return;
+
+        tasks.push({
+            id: Date.now(),
+            name: name,
+            priority: "MEDIUM",
+            done: false
+        });
+
+        input.value = "";
+        render();
+    });
+
+    render();
+</script>
+</body>
+</html>
