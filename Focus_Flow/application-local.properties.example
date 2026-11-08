@@ -1,0 +1,8 @@
+# Copy this file to "application-local.properties" in this folder and fill it in.
+# That copy is git-ignored. Never commit it.
+# Environment variables with the same names take priority over this file.
+DB_USERNAME=root
+DB_PASSWORD=
+# Most MySQL installations listen on 3306.
+DB_PORT=3306
+DB_NAME=focus_flow

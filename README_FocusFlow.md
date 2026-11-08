@@ -176,42 +176,65 @@ FocusFlow
 
 ---
 
-## 6. Development Environment
+## 6. Set Up on a Windows PC
 
 ### Requirements
 
-- JDK 21
-- IntelliJ IDEA
-- Gradle
-- MySQL (when using the MySQL configuration)
+| Software | Version | Notes |
+|---|---|---|
+| JDK | 21 (Eclipse Temurin recommended) | `java -version` must report 21 |
+| MySQL Server | 8.0 or newer | Must be running on the same PC |
+| Git | any | Or download the branch as a ZIP |
 
-### Run Locally
+Gradle does not need to be installed; the project includes its own wrapper.
 
-Clone the repository:
+### Install and Run
 
-```bash
-git clone https://github.com/Saeo-kim/focusflow.git
+```powershell
+git clone -b feature/academy-ready https://github.com/Saeo-kim/FOCUS_FLOW.git
+cd FOCUS_FLOW\Focus_Flow
+copy application-local.properties.example application-local.properties
+notepad application-local.properties
+.\start-focusflow.bat
 ```
 
-Move into the project directory:
+In Notepad, enter your MySQL password and port, then save:
 
-```bash
-cd focusflow
+| Setting | Meaning | Default |
+|---|---|---|
+| `DB_USERNAME` | MySQL user | `root` |
+| `DB_PASSWORD` | MySQL password | none |
+| `DB_PORT` | MySQL port | `3306` in the example file |
+| `DB_NAME` | Database name, created automatically | `focus_flow` |
+
+The first start builds the application, which takes a few minutes. Open <http://localhost:8080>. The start window also lists the address to use from a phone on the same network.
+
+On an empty database, the first start creates all tables and registers the 부산한끼 project: its schedule, team roles, responsibilities, tasks, deadlines, requirements and workflow template.
+
+### Bring Your Existing Records to Another PC
+
+The registered project starts with every task open. To continue with your actual progress, attendance and logs, copy your database. Do this **before** the first start on the new PC.
+
+On the original PC (reads only; the file is saved in `%USERPROFILE%\focus_flow_backups`):
+
+```powershell
+.\scripts\export-data.bat 8181 root
 ```
 
-Run the application on Windows:
+Move the file privately, for example by USB. On the new PC:
 
-```bash
-gradlew.bat bootRun
+```powershell
+.\scripts\import-data.bat C:\path\to\focus_flow_backup_YYYYMMDD-HHmmss.sql 3306 root
 ```
 
-Open the application:
+The import refuses to run on a database that already has tables, so it cannot overwrite anything. Each PC keeps its own copy, and changes do not sync between them.
 
-```text
-http://localhost:8080
-```
+### Never Commit
 
-*The repository URL and startup configuration should be adjusted to match the actual GitHub repository and application settings.*
+- `application-local.properties` (database credentials)
+- `*.sql` and `focus_flow_backup*` (attendance and personal work records)
+- `.env`, API keys and tokens
+- `build/`, `.gradle/`, `.idea/workspace.xml`, `.idea/dataSources*`
 
 ---
 

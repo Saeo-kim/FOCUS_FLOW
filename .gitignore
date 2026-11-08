@@ -1,0 +1,14 @@
+# Credentials and personal data
+application-local.properties
+.env
+*.sql
+focus_flow_backup*
+
+# Machine-specific IDE state
+.idea/workspace.xml
+.idea/dataSources/
+.idea/dataSources.*
+
+# Build output
+build/
+.gradle/
