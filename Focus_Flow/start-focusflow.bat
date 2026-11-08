@@ -19,7 +19,7 @@ if defined JAVA_HOME set "JAVA_CMD=%JAVA_HOME%\bin\java.exe"
 
 if not exist "build\libs\project-flow-0.0.1-SNAPSHOT.jar" (
     echo  First run: building FOCUS FLOW. This takes a few minutes.
-    call gradlew.bat bootJar
+    call "%~dp0gradlew.bat" bootJar
     if errorlevel 1 (
         echo  Build failed. FOCUS FLOW needs JDK 21.
         pause
