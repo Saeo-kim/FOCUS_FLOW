@@ -1,0 +1,119 @@
+package com.example.project_flow.admin.notification;
+
+import com.example.project_flow.admin.submission.SubmissionRepository;
+import com.example.project_flow.admin.submission.SubmissionStatus;
+import com.example.project_flow.entity.ProjectPhase;
+import com.example.project_flow.exception.NotFoundException;
+import com.example.project_flow.repository.ProjectPhaseRepository;
+import org.springframework.data.domain.Limit;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+
+@Service
+public class NotificationService {
+
+    /** Remind this many days before a phase ends when nothing for it has been approved. */
+    private static final int DUE_SOON_DAYS = 2;
+    /** Flag phases that ended this recently with nothing handed in at all. */
+    private static final int OVERDUE_LOOKBACK_DAYS = 7;
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("MMM d", Locale.US);
+
+    private final NotificationRepository notifications;
+    private final ProjectPhaseRepository phases;
+    private final SubmissionRepository submissions;
+    private final Clock clock;
+
+    public NotificationService(NotificationRepository notifications, ProjectPhaseRepository phases,
+                               SubmissionRepository submissions, Clock clock) {
+        this.notifications = notifications;
+        this.phases = phases;
+        this.submissions = submissions;
+        this.clock = clock;
+    }
+
+    public record NotificationResponse(Long id, String type, String title, String message, String link,
+                                       boolean read, LocalDateTime createdAt) {
+        static NotificationResponse from(Notification n) {
+            return new NotificationResponse(n.getId(), n.getType(), n.getTitle(), n.getMessage(), n.getLink(),
+                    n.getReadAt() != null, n.getCreatedAt());
+        }
+    }
+
+    public record Inbox(long unread, List<NotificationResponse> items) {
+    }
+
+    /** Adds a notice for every administrator. */
+    @Transactional
+    public void notifyAdmins(String type, String title, String message, String link) {
+        notifications.save(new Notification(null, type, title, message, link, null, LocalDateTime.now(clock)));
+    }
+
+    /** Not one transaction on purpose: reminders are saved one by one under a lock, so two open tabs cannot add the same reminder twice. */
+    public Inbox inbox(Long userId, int limit) {
+        createPhaseReminders();
+        int size = Math.max(1, Math.min(limit, 100));
+        List<NotificationResponse> items = notifications.findVisible(userId, Limit.of(size)).stream()
+                .map(NotificationResponse::from).toList();
+        return new Inbox(notifications.countUnread(userId), items);
+    }
+
+    @Transactional
+    public void markRead(Long userId, Long id) {
+        Notification n = notifications.findById(id)
+                .filter(x -> x.getRecipientUserId() == null || Objects.equals(x.getRecipientUserId(), userId))
+                .orElseThrow(() -> new NotFoundException("That notification no longer exists."));
+        n.markRead(LocalDateTime.now(clock));
+    }
+
+    @Transactional
+    public void markAllRead(Long userId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        notifications.findUnread(userId).forEach(n -> n.markRead(now));
+    }
+
+    /**
+     * Reads the existing 회차 schedule (never changes it) and adds one reminder per phase that is
+     * about to end without an approved submission, or that ended recently with no submission.
+     */
+    private synchronized void createPhaseReminders() {
+        LocalDate today = LocalDate.now(clock);
+        Set<Long> submitted = new HashSet<>();
+        Set<Long> approved = new HashSet<>();
+        submissions.findAll().forEach(s -> {
+            submitted.add(s.getPhaseId());
+            if (s.getStatus() == SubmissionStatus.APPROVED) {
+                approved.add(s.getPhaseId());
+            }
+        });
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (ProjectPhase phase : phases.findAll()) {
+            LocalDate end = phase.getEndDate();
+            String link = "#/submissions?phase=" + phase.getId();
+            if (!end.isBefore(today) && !end.isAfter(today.plusDays(DUE_SOON_DAYS)) && !approved.contains(phase.getId())) {
+                String key = "PHASE_DUE:" + phase.getId() + ":" + end;
+                if (!notifications.existsByDedupeKey(key)) {
+                    String when = end.equals(today) ? "today" : "on " + DAY.format(end);
+                    notifications.save(new Notification(null, "PHASE_DUE", phase.getName() + " submission due " + when,
+                            submitted.contains(phase.getId()) ? "A submission is waiting for review." : "Nothing has been submitted for this phase yet.",
+                            link, key, now));
+                }
+            } else if (end.isBefore(today) && !end.isBefore(today.minusDays(OVERDUE_LOOKBACK_DAYS)) && !submitted.contains(phase.getId())) {
+                String key = "PHASE_OVERDUE:" + phase.getId() + ":" + end;
+                if (!notifications.existsByDedupeKey(key)) {
+                    notifications.save(new Notification(null, "PHASE_OVERDUE", phase.getName() + " ended with no submission",
+                            "The phase ended on " + DAY.format(end) + ".", link, key, now));
+                }
+            }
+        }
+    }
+}
