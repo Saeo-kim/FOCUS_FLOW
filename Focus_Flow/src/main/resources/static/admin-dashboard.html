@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!--
-    Admin edition of FOCUS FLOW, served at /admin-dashboard.
-    It is a copy of index.html plus the header actions and admin.js/admin.css: every original page
-    still works here through the same app.js and workspace.js, and index.html itself is unchanged.
+    ADMIN workspace, served at /admin (and /admin-dashboard) to administrators only.
+    It reuses index.html's layout and every original page through the same app.js and workspace.js,
+    plus shell.js (session, bell, account) and admin.js (management pages). index.html itself is unchanged.
 -->
 <html lang="en">
 <head>
@@ -12,6 +12,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/css/app.css">
     <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/admin.css">
 </head>
 
 <body class="admin-edition">

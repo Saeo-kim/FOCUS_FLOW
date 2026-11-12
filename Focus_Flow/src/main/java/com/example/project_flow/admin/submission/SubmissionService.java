@@ -98,6 +98,26 @@ public class SubmissionService {
                 events.findBySubmission_IdOrderByCreatedAtAscIdAsc(id).stream().map(EventResponse::from).toList());
     }
 
+    /** Every stored file with the submission it belongs to, newest first, for the admin file manager. */
+    public record StoredFile(Long id, Long submissionId, String submissionTitle, SubmissionStatus status,
+                             Long projectId, String projectName, Long phaseId, String phaseName,
+                             String submitterName, Long submitterUserId, int version, String originalName,
+                             long sizeBytes, LocalDateTime uploadedAt) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoredFile> allFiles() {
+        Map<Long, SubmissionResponse> byId = toResponses(submissions.findAll()).stream()
+                .collect(Collectors.toMap(SubmissionResponse::id, Function.identity()));
+        return files.findAll().stream()
+                .sorted(Comparator.comparing(SubmissionFile::getUploadedAt).reversed().thenComparing(SubmissionFile::getId, Comparator.reverseOrder()))
+                .map(f -> {
+                    SubmissionResponse s = byId.get(f.getSubmission().getId());
+                    return new StoredFile(f.getId(), s.id(), s.title(), s.status(), s.projectId(), s.projectName(), s.phaseId(), s.phaseName(),
+                            s.submitterName(), f.getSubmission().getSubmitterUserId(), f.getVersion(), f.getOriginalName(), f.getSizeBytes(), f.getUploadedAt());
+                }).toList();
+    }
+
     /* ---------- One member's own submissions ---------- */
 
     @Transactional(readOnly = true)
@@ -374,7 +394,7 @@ public class SubmissionService {
                     s.getPhaseId(), phase == null ? null : phase.getName(),
                     phase == null ? null : phase.getStartDate(), phase == null ? null : phase.getEndDate(),
                     s.getTaskId(), task == null ? null : task.getTitle(),
-                    s.getTitle(), s.getNote(), s.getSubmitterName(), s.getStatus(), s.getCurrentVersion(),
+                    s.getTitle(), s.getNote(), s.getSubmitterName(), s.getSubmitterUserId(), s.getStatus(), s.getCurrentVersion(),
                     s.getReviewComment(), s.getReviewedBy(), s.getReviewedAt(),
                     s.getSubmittedAt(), s.getCreatedAt(), s.getUpdatedAt(), t[0], t[1], late);
         }).toList();
