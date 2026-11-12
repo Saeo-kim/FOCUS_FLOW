@@ -269,3 +269,37 @@ By making work visible and actionable, FocusFlow aims to help individuals and sm
 ---
 
 **FocusFlow — Make room for what matters.**
+
+
+---
+
+## Appendix: Accounts, Roles and Workspaces
+
+FocusFlow is one application with one sign-in. Where you land depends on your role.
+
+| Address | Who | What it is |
+|---|---|---|
+| `/login` | Everyone | Sign in, join with an invitation code, password help, first-time administrator setup |
+| `/admin` | ADMIN | Management workspace: Company Overview, Members, Task Assignment, Review Queue, Submission Tracker, Files, and every original FocusFlow page |
+| `/member` | MEMBER | Personal workspace: My Overview, My Tasks, My Projects, Calendar, My Submissions, My Account |
+
+`/` sends you to the right place. Signed-out visitors see only the login page.
+
+### First start with accounts
+
+1. Open `http://localhost:8080/login`. On a database without an administrator, the page asks you to create one. Your existing projects and tasks are kept as they are.
+2. In **Members**, choose **Invite member**. FocusFlow shows a one-time code (valid 7 days).
+3. The member opens `/login`, chooses **I have an invitation code**, and picks a password.
+4. In **Task Assignment**, give tasks an owner. The member sees them at once and gets a notification.
+
+Forgotten passwords go through the administrator: **Members → Reset access** issues a new code. Email sending is not built in.
+
+### How access is enforced
+
+- Every `/api/**` request is checked on the server. The original APIs are ADMIN only.
+- `/api/member/**` answers only with the signed-in member's own tasks, projects, submissions and files. Another member's ids answer `404`.
+- Workspace pages are refused to the wrong role, also when opened by file name.
+
+### Database changes
+
+Only new tables were added (`app_users`, `project_members`, `task_assignments`, `submissions`, `submission_files`, `submission_events`, `notifications`). None has a foreign key into an existing table, and no existing table or column was changed. Uploaded files are stored outside the project in `%USERPROFILE%\focus_flow_uploads`.

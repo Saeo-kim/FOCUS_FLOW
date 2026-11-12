@@ -17,6 +17,7 @@ import com.example.project_flow.exception.NotFoundException;
 import com.example.project_flow.repository.ProjectPhaseRepository;
 import com.example.project_flow.repository.ProjectRepository;
 import com.example.project_flow.repository.TaskRepository;
+import com.example.project_flow.service.ActivityLogService;
 import com.example.project_flow.service.References;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,11 +56,12 @@ public class SubmissionService {
     private final ProjectPhaseRepository phases;
     private final TaskRepository tasks;
     private final NotificationService notifications;
+    private final ActivityLogService activity;
     private final Clock clock;
 
     public SubmissionService(SubmissionRepository submissions, SubmissionFileRepository files, SubmissionEventRepository events,
                              SubmissionFileStorage storage, ProjectRepository projects, ProjectPhaseRepository phases,
-                             TaskRepository tasks, NotificationService notifications, Clock clock) {
+                             TaskRepository tasks, NotificationService notifications, ActivityLogService activity, Clock clock) {
         this.submissions = submissions;
         this.files = files;
         this.events = events;
@@ -68,6 +70,7 @@ public class SubmissionService {
         this.phases = phases;
         this.tasks = tasks;
         this.notifications = notifications;
+        this.activity = activity;
         this.clock = clock;
     }
 
@@ -221,6 +224,7 @@ public class SubmissionService {
                 requireTitle(title), cleanNote(note), who, user.getId(), now));
         saveFiles(submission, incoming, now);
         events.save(new SubmissionEvent(submission, SubmissionEvent.Type.SUBMITTED, null, who, now));
+        log("SUBMISSION_SUBMITTED", who + " submitted \"" + submission.getTitle() + "\" for " + phase.getName());
         notifications.notifyAdmins("SUBMISSION_NEW", "New submission for " + phase.getName(),
                 "\"" + submission.getTitle() + "\" · " + incoming.size() + (incoming.size() == 1 ? " file" : " files"),
                 "#/submission?id=" + submission.getId());
@@ -238,6 +242,7 @@ public class SubmissionService {
         submission.resubmit(cleanNote(note), now);
         saveFiles(submission, incoming, now);
         events.save(new SubmissionEvent(submission, SubmissionEvent.Type.RESUBMITTED, cleanNote(note), user.getDisplayName(), now));
+        log("SUBMISSION_RESUBMITTED", user.getDisplayName() + " resubmitted \"" + submission.getTitle() + "\" as version " + submission.getCurrentVersion());
         notifications.notifyAdmins("SUBMISSION_RESUBMITTED", "Resubmitted: " + submission.getTitle(),
                 "Version " + submission.getCurrentVersion() + " is waiting for review.", "#/submission?id=" + id);
         return toResponses(List.of(submission)).getFirst();
@@ -258,6 +263,8 @@ public class SubmissionService {
         boolean approved = decision == SubmissionStatus.APPROVED;
         events.save(new SubmissionEvent(submission, approved ? SubmissionEvent.Type.APPROVED : SubmissionEvent.Type.REJECTED,
                 submission.getReviewComment(), reviewer.getDisplayName(), now));
+        log(approved ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED", reviewer.getDisplayName() + (approved ? " approved \"" : " rejected \"")
+                + submission.getTitle() + "\" by " + submission.getSubmitterName());
         String title = (approved ? "Approved: " : "Rejected: ") + submission.getTitle();
         String message = text == null ? "Reviewed by " + reviewer.getDisplayName() + "." : text;
         if (submission.getSubmitterUserId() != null && !submission.getSubmitterUserId().equals(reviewer.getId())) {
@@ -416,6 +423,11 @@ public class SubmissionService {
                     return new PhaseBoardRow(phase.getId(), phase.getProjectId(), projectNames.get(phase.getProjectId()),
                             phase.getName(), phase.getStartDate(), phase.getEndDate(), list.size(), pending, approved, rejected, overall);
                 }).toList();
+    }
+
+    /** Mirrors submission milestones into the existing Activity Log, within the same transaction. */
+    private void log(String type, String message) {
+        activity.record(type, message.length() > 500 ? message.substring(0, 497) + "..." : message);
     }
 
     private static int count(List<Submission> list, SubmissionStatus status) {

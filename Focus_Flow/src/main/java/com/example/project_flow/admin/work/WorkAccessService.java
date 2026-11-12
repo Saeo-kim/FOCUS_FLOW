@@ -10,6 +10,7 @@ import com.example.project_flow.exception.NotFoundException;
 import com.example.project_flow.repository.ProjectRepository;
 import com.example.project_flow.repository.TaskRepository;
 import com.example.project_flow.repository.WorkStepRepository;
+import com.example.project_flow.service.ActivityLogService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,11 +39,12 @@ public class WorkAccessService {
     private final WorkStepRepository steps;
     private final AccountService accounts;
     private final NotificationService notifications;
+    private final ActivityLogService activity;
     private final Clock clock;
 
     public WorkAccessService(TaskAssignmentRepository assignments, ProjectMemberRepository members, TaskRepository tasks,
                              ProjectRepository projects, WorkStepRepository steps, AccountService accounts,
-                             NotificationService notifications, Clock clock) {
+                             NotificationService notifications, ActivityLogService activity, Clock clock) {
         this.assignments = assignments;
         this.members = members;
         this.tasks = tasks;
@@ -50,6 +52,7 @@ public class WorkAccessService {
         this.steps = steps;
         this.accounts = accounts;
         this.notifications = notifications;
+        this.activity = activity;
         this.clock = clock;
     }
 
@@ -116,6 +119,7 @@ public class WorkAccessService {
         if (userId == null) {
             if (current != null) {
                 assignments.delete(current);
+                activity.record("TASK_UNASSIGNED", actor.getDisplayName() + " removed the owner of \"" + task.getTitle() + "\"");
             }
             return new Assignment(taskId, null, null, null, null);
         }
@@ -131,6 +135,9 @@ public class WorkAccessService {
         }
         if (task.getProject() != null) {
             addMember(task.getProject().getId(), userId);
+        }
+        if (changed) {
+            activity.record("TASK_ASSIGNED", actor.getDisplayName() + " assigned \"" + task.getTitle() + "\" to " + person.getDisplayName());
         }
         if (changed && !Objects.equals(userId, actor.getId())) {
             notifications.notifyUser(userId, "TASK_ASSIGNED", "New task: " + task.getTitle(),
