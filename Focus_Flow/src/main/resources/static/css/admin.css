@@ -1,0 +1,61 @@
+/* ADMIN workspace only (admin-dashboard.html). Builds on app.css and shell.css with the same tokens. */
+
+.overview-group { margin: 6px 0 8px; }
+.metric-grid + .overview-group { margin-top: 18px; }
+
+/* Needs attention */
+.attention-stack { display: flex; flex-direction: column; }
+.attn-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--border);
+    color: inherit;
+}
+.attn-row:last-child { border-bottom: 0; }
+.attn-row:hover { text-decoration: none; background: var(--surface-2); }
+.attn-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+
+/* Tables */
+td.wrap { white-space: normal; overflow-wrap: anywhere; min-width: 140px; }
+table.compact td, table.compact th { padding: 8px; }
+.row-late td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+
+.person { display: flex; align-items: center; gap: 10px; }
+.avatar-btn.small { width: 30px; height: 30px; font-size: 13px; }
+.members-table td { vertical-align: middle; }
+
+.assignee-select { width: 210px; padding: 6px 8px; }
+.assignee-select.empty { color: var(--amber); border-color: #e6c88a; background: var(--amber-soft); }
+
+.tracker-table th { vertical-align: bottom; white-space: nowrap; }
+.tracker-table th .tag { margin-top: 4px; }
+.th-sub { font-weight: 400; font-size: 11px; }
+.tracker-table td { text-align: left; }
+.tracker-total td { font-weight: 600; color: var(--text-2); background: var(--surface-2); }
+
+.files-table .file-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+
+/* Invitation code */
+.invite-box { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.invite-code {
+    flex: 1;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 22px;
+    letter-spacing: 3px;
+    text-align: center;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: 700;
+}
+.invite-steps { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); }
+
+@media (max-width: 560px) {
+    .attn-row { grid-template-columns: 1fr; gap: 4px; }
+    .invite-code { font-size: 18px; letter-spacing: 2px; }
+    .assignee-select { width: 160px; }
+}

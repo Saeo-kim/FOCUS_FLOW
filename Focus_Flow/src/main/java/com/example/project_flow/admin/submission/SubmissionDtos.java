@@ -27,7 +27,7 @@ public final class SubmissionDtos {
             Long projectId, String projectName,
             Long phaseId, String phaseName, LocalDate phaseStartDate, LocalDate phaseEndDate,
             Long taskId, String taskTitle,
-            String title, String note, String submitterName,
+            String title, String note, String submitterName, Long submitterUserId,
             SubmissionStatus status, int currentVersion,
             String reviewComment, String reviewedBy, LocalDateTime reviewedAt,
             LocalDateTime submittedAt, LocalDateTime createdAt, LocalDateTime updatedAt,
