@@ -70,7 +70,7 @@ public class SubmissionController {
                                      @RequestParam(required = false) String submitterName,
                                      @RequestPart(name = "files", required = false) List<MultipartFile> files,
                                      HttpServletRequest request) {
-        return service.create(AdminSession.user(request), projectId, phaseId, taskId, title, note, submitterName, files);
+        return service.create(UserSession.user(request), projectId, phaseId, taskId, title, note, submitterName, files);
     }
 
     @PostMapping(value = "/submissions/{id}/resubmit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -78,29 +78,29 @@ public class SubmissionController {
                                        @RequestParam(required = false) String note,
                                        @RequestPart(name = "files", required = false) List<MultipartFile> files,
                                        HttpServletRequest request) {
-        return service.resubmit(AdminSession.user(request), id, note, files);
+        return service.resubmit(UserSession.user(request), id, note, files);
     }
 
     @PostMapping("/submissions/{id}/approve")
     public SubmissionResponse approve(@PathVariable Long id, @Valid @RequestBody(required = false) ReviewRequest body,
                                       HttpServletRequest request) {
-        return service.review(AdminSession.user(request), id, SubmissionStatus.APPROVED, body == null ? null : body.comment());
+        return service.review(UserSession.user(request), id, SubmissionStatus.APPROVED, body == null ? null : body.comment());
     }
 
     @PostMapping("/submissions/{id}/reject")
     public SubmissionResponse reject(@PathVariable Long id, @Valid @RequestBody(required = false) ReviewRequest body,
                                      HttpServletRequest request) {
-        return service.review(AdminSession.user(request), id, SubmissionStatus.REJECTED, body == null ? null : body.comment());
+        return service.review(UserSession.user(request), id, SubmissionStatus.REJECTED, body == null ? null : body.comment());
     }
 
     @PostMapping("/submissions/{id}/reopen")
     public SubmissionResponse reopen(@PathVariable Long id, HttpServletRequest request) {
-        return service.reopen(AdminSession.user(request), id);
+        return service.reopen(UserSession.user(request), id);
     }
 
     @PutMapping("/submissions/{id}")
     public SubmissionResponse edit(@PathVariable Long id, @Valid @RequestBody EditRequest body, HttpServletRequest request) {
-        return service.edit(AdminSession.user(request), id, body);
+        return service.edit(UserSession.user(request), id, body);
     }
 
     @DeleteMapping("/submissions/{id}")

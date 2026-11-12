@@ -4,13 +4,13 @@ import com.example.project_flow.admin.account.AppUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
-/** Where the signed-in administrator lives: the session holds the id, the request holds the loaded user. */
-public final class AdminSession {
+/** Where the signed-in user lives: the session holds the id, the request holds the loaded user. */
+public final class UserSession {
 
-    static final String SESSION_USER_ID = "focusflow.admin.userId";
-    static final String REQUEST_USER = "focusflow.admin.user";
+    static final String SESSION_USER_ID = "focusflow.userId";
+    static final String REQUEST_USER = "focusflow.user";
 
-    private AdminSession() {
+    private UserSession() {
     }
 
     public static Long userId(HttpServletRequest request) {
@@ -18,7 +18,7 @@ public final class AdminSession {
         return session == null ? null : (Long) session.getAttribute(SESSION_USER_ID);
     }
 
-    /** The user the interceptor verified for this request. Only valid behind {@link AdminAuthInterceptor}. */
+    /** The user the interceptor verified for this request. Only valid behind {@link AuthInterceptor}. */
     public static AppUser user(HttpServletRequest request) {
         return (AppUser) request.getAttribute(REQUEST_USER);
     }

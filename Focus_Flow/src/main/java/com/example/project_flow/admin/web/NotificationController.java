@@ -1,5 +1,7 @@
 package com.example.project_flow.admin.web;
 
+import com.example.project_flow.admin.account.AppUser;
+import com.example.project_flow.admin.account.UserRole;
 import com.example.project_flow.admin.notification.NotificationService;
 import com.example.project_flow.admin.notification.NotificationService.Inbox;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,8 +14,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+/** The bell menu for whoever is signed in. /api/admin/notifications is the earlier, admin-only address. */
 @RestController
-@RequestMapping("/api/admin/notifications")
+@RequestMapping({"/api/me/notifications", "/api/admin/notifications"})
 public class NotificationController {
 
     private final NotificationService service;
@@ -24,18 +27,25 @@ public class NotificationController {
 
     @GetMapping
     public Inbox inbox(@RequestParam(defaultValue = "20") int limit, HttpServletRequest request) {
-        return service.inbox(AdminSession.user(request).getId(), limit);
+        AppUser user = UserSession.user(request);
+        return service.inbox(user.getId(), isAdmin(user), limit);
     }
 
     @PostMapping("/{id}/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void read(@PathVariable Long id, HttpServletRequest request) {
-        service.markRead(AdminSession.user(request).getId(), id);
+        AppUser user = UserSession.user(request);
+        service.markRead(user.getId(), isAdmin(user), id);
     }
 
     @PostMapping("/read-all")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void readAll(HttpServletRequest request) {
-        service.markAllRead(AdminSession.user(request).getId());
+        AppUser user = UserSession.user(request);
+        service.markAllRead(user.getId(), isAdmin(user));
+    }
+
+    private static boolean isAdmin(AppUser user) {
+        return user.getRole() == UserRole.ADMIN;
     }
 }

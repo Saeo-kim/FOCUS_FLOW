@@ -1,4 +1,4 @@
-/* Admin edition only (admin-dashboard.html). Builds on app.css and reuses its tokens; app.css is unchanged. */
+/* Shared by the ADMIN and MEMBER workspaces. Builds on app.css and reuses its tokens; app.css is unchanged. */
 
 /* Header actions */
 .topbar-actions { display: flex; align-items: center; gap: 6px; }
