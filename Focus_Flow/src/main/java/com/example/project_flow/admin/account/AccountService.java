@@ -10,6 +10,7 @@ import com.example.project_flow.admin.account.AccountDtos.SetupRequest;
 import com.example.project_flow.admin.account.AccountDtos.UserResponse;
 import com.example.project_flow.exception.ConflictException;
 import com.example.project_flow.exception.NotFoundException;
+import com.example.project_flow.service.ActivityLogService;
 import com.example.project_flow.service.References;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,14 +40,16 @@ public class AccountService {
 
     private final AppUserRepository users;
     private final PasswordHasher hasher;
+    private final ActivityLogService activity;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     /** key -> {failures, lockedUntilMillis}; in memory, so a restart clears it. */
     private final Map<String, long[]> failures = new ConcurrentHashMap<>();
 
-    public AccountService(AppUserRepository users, PasswordHasher hasher, Clock clock) {
+    public AccountService(AppUserRepository users, PasswordHasher hasher, ActivityLogService activity, Clock clock) {
         this.users = users;
         this.hasher = hasher;
+        this.activity = activity;
         this.clock = clock;
     }
 
@@ -117,8 +120,11 @@ public class AccountService {
         if (!user.isActive()) {
             throw new ConflictException("This account has been deactivated. Contact your administrator.");
         }
+        boolean firstTime = !user.isPasswordSet() && user.getLastLoginAt() == null;
         user.changePassword(hasher.hash(request.password()));
         user.signedIn(LocalDateTime.now(clock));
+        activity.record(firstTime ? "ACCOUNT_JOINED" : "ACCOUNT_PASSWORD_RESET",
+                user.getDisplayName() + (firstTime ? " joined with an invitation" : " set a new password with a reset code"));
         return user;
     }
 
@@ -144,6 +150,7 @@ public class AccountService {
         AppUser user = new AppUser(username, request.displayName().trim(), unusableHash(), role, LocalDateTime.now(clock));
         user.changeEmail(email);
         users.save(user);
+        activity.record("ACCOUNT_INVITED", "Invited " + user.getDisplayName() + " (@" + username + ") as " + (role == UserRole.ADMIN ? "administrator" : "member"));
         return issue(user, true);
     }
 
@@ -154,6 +161,7 @@ public class AccountService {
         if (Objects.equals(actorId, userId)) {
             throw new ConflictException("Change your own password from Account settings instead.");
         }
+        activity.record("ACCOUNT_RESET", "Issued a new access code for " + user.getDisplayName() + " (@" + user.getUsername() + ")");
         return issue(user, true);
     }
 
@@ -172,7 +180,9 @@ public class AccountService {
         }
         user.rename(request.displayName().trim());
         user.changeEmail(email);
-        if (request.active() != null) {
+        if (request.active() != null && request.active() != user.isActive()) {
+            activity.record(request.active() ? "ACCOUNT_REACTIVATED" : "ACCOUNT_DEACTIVATED",
+                    (request.active() ? "Reactivated " : "Deactivated ") + user.getDisplayName() + " (@" + user.getUsername() + ")");
             user.setActive(request.active());
         }
         return UserResponse.from(user);
