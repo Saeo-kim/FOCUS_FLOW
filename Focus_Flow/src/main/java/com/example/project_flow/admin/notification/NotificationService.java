@@ -59,26 +59,26 @@ public class NotificationService {
     }
 
     /** Not one transaction on purpose: reminders are saved one by one under a lock, so two open tabs cannot add the same reminder twice. */
-    public Inbox inbox(Long userId, int limit) {
+    public Inbox inbox(Long userId, boolean admin, int limit) {
         createPhaseReminders();
         int size = Math.max(1, Math.min(limit, 100));
-        List<NotificationResponse> items = notifications.findVisible(userId, Limit.of(size)).stream()
+        List<NotificationResponse> items = notifications.findVisible(userId, admin, Limit.of(size)).stream()
                 .map(NotificationResponse::from).toList();
-        return new Inbox(notifications.countUnread(userId), items);
+        return new Inbox(notifications.countUnread(userId, admin), items);
     }
 
     @Transactional
-    public void markRead(Long userId, Long id) {
+    public void markRead(Long userId, boolean admin, Long id) {
         Notification n = notifications.findById(id)
-                .filter(x -> x.getRecipientUserId() == null || Objects.equals(x.getRecipientUserId(), userId))
+                .filter(x -> x.getRecipientUserId() == null ? admin : Objects.equals(x.getRecipientUserId(), userId))
                 .orElseThrow(() -> new NotFoundException("That notification no longer exists."));
         n.markRead(LocalDateTime.now(clock));
     }
 
     @Transactional
-    public void markAllRead(Long userId) {
+    public void markAllRead(Long userId, boolean admin) {
         LocalDateTime now = LocalDateTime.now(clock);
-        notifications.findUnread(userId).forEach(n -> n.markRead(now));
+        notifications.findUnread(userId, admin).forEach(n -> n.markRead(now));
     }
 
     /**

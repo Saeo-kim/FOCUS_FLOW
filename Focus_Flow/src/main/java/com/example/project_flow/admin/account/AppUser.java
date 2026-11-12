@@ -12,8 +12,9 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 /**
- * A person who signs in to the admin dashboard. Today there is exactly one ADMIN; the role column
- * leaves room for member accounts later without changing this table.
+ * Someone who signs in to FOCUS FLOW: an ADMIN who manages, or a MEMBER who executes.
+ * Members are invited by an administrator and choose their own password with a one-time code.
+ * Columns added after the first release are nullable so existing rows stay valid.
  */
 @Entity
 @Table(name = "app_users")
@@ -26,6 +27,9 @@ public class AppUser {
     @Column(nullable = false, unique = true, length = 40)
     private String username;
 
+    @Column(unique = true, length = 120)
+    private String email;
+
     @Column(nullable = false, length = 60)
     private String displayName;
 
@@ -35,6 +39,18 @@ public class AppUser {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role;
+
+    /** Null on rows created before this column existed, which counts as active. */
+    private Boolean active;
+
+    /** False while an invited member has not chosen a password yet. Null on older rows means set. */
+    private Boolean passwordSet;
+
+    /** SHA-256 of the current invitation or reset code; the code itself is never stored. */
+    @Column(unique = true, length = 64)
+    private String inviteCodeHash;
+
+    private LocalDateTime inviteExpiresAt;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -50,17 +66,44 @@ public class AppUser {
         this.passwordHash = passwordHash;
         this.role = role;
         this.createdAt = createdAt;
+        this.active = true;
+        this.passwordSet = true;
     }
 
     public void rename(String displayName) { this.displayName = displayName; }
-    public void changePassword(String passwordHash) { this.passwordHash = passwordHash; }
+    public void changeEmail(String email) { this.email = email; }
+    public void setActive(boolean active) { this.active = active; }
     public void signedIn(LocalDateTime at) { this.lastLoginAt = at; }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.passwordSet = true;
+        this.inviteCodeHash = null;
+        this.inviteExpiresAt = null;
+    }
+
+    /** Issues a one-time code; with {@code lockPassword} the old password stops working until the code is used. */
+    public void issueCode(String codeHash, LocalDateTime expiresAt, boolean lockPassword, String unusableHash) {
+        this.inviteCodeHash = codeHash;
+        this.inviteExpiresAt = expiresAt;
+        if (lockPassword) {
+            this.passwordHash = unusableHash;
+            this.passwordSet = false;
+        }
+    }
+
+    public boolean isActive() { return active == null || active; }
+    public boolean isPasswordSet() { return passwordSet == null || passwordSet; }
+    public boolean hasPendingCode() { return inviteCodeHash != null; }
 
     public Long getId() { return id; }
     public String getUsername() { return username; }
+    public String getEmail() { return email; }
     public String getDisplayName() { return displayName; }
     public String getPasswordHash() { return passwordHash; }
     public UserRole getRole() { return role; }
+    public String getInviteCodeHash() { return inviteCodeHash; }
+    public LocalDateTime getInviteExpiresAt() { return inviteExpiresAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
 }
