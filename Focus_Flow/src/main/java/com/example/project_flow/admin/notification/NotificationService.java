@@ -2,6 +2,11 @@ package com.example.project_flow.admin.notification;
 
 import com.example.project_flow.admin.submission.SubmissionRepository;
 import com.example.project_flow.admin.submission.SubmissionStatus;
+import com.example.project_flow.admin.work.ProjectMember;
+import com.example.project_flow.admin.work.ProjectMemberRepository;
+import com.example.project_flow.admin.work.TaskAssignment;
+import com.example.project_flow.admin.work.TaskAssignmentRepository;
+import com.example.project_flow.repository.TaskRepository;
 import com.example.project_flow.entity.ProjectPhase;
 import com.example.project_flow.exception.NotFoundException;
 import com.example.project_flow.repository.ProjectPhaseRepository;
@@ -31,13 +36,20 @@ public class NotificationService {
     private final NotificationRepository notifications;
     private final ProjectPhaseRepository phases;
     private final SubmissionRepository submissions;
+    private final ProjectMemberRepository projectMembers;
+    private final TaskAssignmentRepository assignments;
+    private final TaskRepository tasks;
     private final Clock clock;
 
     public NotificationService(NotificationRepository notifications, ProjectPhaseRepository phases,
-                               SubmissionRepository submissions, Clock clock) {
+                               SubmissionRepository submissions, ProjectMemberRepository projectMembers,
+                               TaskAssignmentRepository assignments, TaskRepository tasks, Clock clock) {
         this.notifications = notifications;
         this.phases = phases;
         this.submissions = submissions;
+        this.projectMembers = projectMembers;
+        this.assignments = assignments;
+        this.tasks = tasks;
         this.clock = clock;
     }
 
@@ -58,9 +70,19 @@ public class NotificationService {
         notifications.save(new Notification(null, type, title, message, link, null, LocalDateTime.now(clock)));
     }
 
+    /** Adds a notice for one person only. */
+    @Transactional
+    public void notifyUser(Long userId, String type, String title, String message, String link) {
+        notifications.save(new Notification(userId, type, title, message, link, null, LocalDateTime.now(clock)));
+    }
+
     /** Not one transaction on purpose: reminders are saved one by one under a lock, so two open tabs cannot add the same reminder twice. */
     public Inbox inbox(Long userId, boolean admin, int limit) {
-        createPhaseReminders();
+        if (admin) {
+            createPhaseReminders();
+        } else {
+            createMemberReminders(userId);
+        }
         int size = Math.max(1, Math.min(limit, 100));
         List<NotificationResponse> items = notifications.findVisible(userId, admin, Limit.of(size)).stream()
                 .map(NotificationResponse::from).toList();
@@ -113,6 +135,44 @@ public class NotificationService {
                     notifications.save(new Notification(null, "PHASE_OVERDUE", phase.getName() + " ended with no submission",
                             "The phase ended on " + DAY.format(end) + ".", link, key, now));
                 }
+            }
+        }
+    }
+
+    /**
+     * A member's own reminders: a phase of one of their projects ends within two days and they
+     * have nothing approved for it yet.
+     */
+    private synchronized void createMemberReminders(Long userId) {
+        LocalDate today = LocalDate.now(clock);
+        Set<Long> projectIds = new HashSet<>();
+        projectMembers.findByUserId(userId).stream().map(ProjectMember::getProjectId).forEach(projectIds::add);
+        tasks.findAllById(assignments.findByUserId(userId).stream().map(TaskAssignment::getTaskId).toList())
+                .forEach(t -> { if (t.getProject() != null) projectIds.add(t.getProject().getId()); });
+        if (projectIds.isEmpty()) {
+            return;
+        }
+        Set<Long> approved = new HashSet<>();
+        Set<Long> submitted = new HashSet<>();
+        submissions.findAll().stream().filter(s -> userId.equals(s.getSubmitterUserId())).forEach(s -> {
+            submitted.add(s.getPhaseId());
+            if (s.getStatus() == SubmissionStatus.APPROVED) {
+                approved.add(s.getPhaseId());
+            }
+        });
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (ProjectPhase phase : phases.findAll()) {
+            LocalDate end = phase.getEndDate();
+            if (!projectIds.contains(phase.getProjectId()) || approved.contains(phase.getId())
+                    || end.isBefore(today) || end.isAfter(today.plusDays(DUE_SOON_DAYS))) {
+                continue;
+            }
+            String key = "PHASE_DUE:" + phase.getId() + ":" + end + ":u" + userId;
+            if (!notifications.existsByDedupeKey(key)) {
+                String when = end.equals(today) ? "today" : "on " + DAY.format(end);
+                notifications.save(new Notification(userId, "PHASE_DUE", phase.getName() + " submission due " + when,
+                        submitted.contains(phase.getId()) ? "Your submission is waiting for review." : "You haven't submitted for this phase yet.",
+                        "#/submissions?phase=" + phase.getId(), key, now));
             }
         }
     }

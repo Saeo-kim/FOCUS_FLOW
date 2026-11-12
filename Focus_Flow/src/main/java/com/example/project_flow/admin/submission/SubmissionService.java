@@ -98,6 +98,57 @@ public class SubmissionService {
                 events.findBySubmission_IdOrderByCreatedAtAscIdAsc(id).stream().map(EventResponse::from).toList());
     }
 
+    /* ---------- One member's own submissions ---------- */
+
+    @Transactional(readOnly = true)
+    public List<SubmissionResponse> listForUser(Long userId) {
+        return toResponses(submissions.findAllByOrderBySubmittedAtDescIdDesc().stream()
+                .filter(s -> userId.equals(s.getSubmitterUserId())).toList());
+    }
+
+    /** A submission the person handed in themselves; anything else looks like it does not exist. */
+    @Transactional(readOnly = true)
+    public Submission requireOwned(Long userId, Long id) {
+        Submission submission = submissions.findById(id).orElse(null);
+        if (submission == null || !userId.equals(submission.getSubmitterUserId())) {
+            throw new NotFoundException("That submission is not in your workspace.");
+        }
+        return submission;
+    }
+
+    @Transactional(readOnly = true)
+    public SubmissionDetail detailForUser(Long userId, Long id) {
+        requireOwned(userId, id);
+        return detail(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Download downloadForUser(Long userId, Long fileId) {
+        SubmissionFile file = files.findById(fileId).orElseThrow(() -> new NotFoundException("That file no longer exists."));
+        requireOwned(userId, file.getSubmission().getId());
+        return download(fileId);
+    }
+
+    /** Per phase, the latest status of each person's submissions: who handed in, who did not. */
+    @Transactional(readOnly = true)
+    public Map<Long, Map<Long, SubmissionStatus>> statusByPhaseAndUser(Long projectId) {
+        Map<Long, Map<Long, SubmissionStatus>> result = new HashMap<>();
+        submissions.findAllByOrderBySubmittedAtDescIdDesc().stream()
+                .filter(s -> projectId.equals(s.getProjectId()) && s.getSubmitterUserId() != null)
+                .forEach(s -> result.computeIfAbsent(s.getPhaseId(), k -> new HashMap<>())
+                        .merge(s.getSubmitterUserId(), s.getStatus(), SubmissionService::stronger));
+        return result;
+    }
+
+    /** Approved beats pending beats rejected: one approved submission covers the phase. */
+    private static SubmissionStatus stronger(SubmissionStatus a, SubmissionStatus b) {
+        return rank(a) <= rank(b) ? a : b;
+    }
+
+    private static int rank(SubmissionStatus s) {
+        return switch (s) { case APPROVED -> 0; case SUBMITTED -> 1; case REJECTED -> 2; };
+    }
+
     @Transactional(readOnly = true)
     public DashboardSummary dashboard() {
         List<Submission> all = submissions.findAll();
@@ -187,10 +238,14 @@ public class SubmissionService {
         boolean approved = decision == SubmissionStatus.APPROVED;
         events.save(new SubmissionEvent(submission, approved ? SubmissionEvent.Type.APPROVED : SubmissionEvent.Type.REJECTED,
                 submission.getReviewComment(), reviewer.getDisplayName(), now));
-        notifications.notifyAdmins(approved ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED",
-                (approved ? "Approved: " : "Rejected: ") + submission.getTitle(),
-                text == null ? "Reviewed by " + reviewer.getDisplayName() + "." : text,
-                "#/submission?id=" + id);
+        String title = (approved ? "Approved: " : "Rejected: ") + submission.getTitle();
+        String message = text == null ? "Reviewed by " + reviewer.getDisplayName() + "." : text;
+        if (submission.getSubmitterUserId() != null && !submission.getSubmitterUserId().equals(reviewer.getId())) {
+            notifications.notifyUser(submission.getSubmitterUserId(), approved ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED",
+                    title, approved ? message : "Reason: " + message, "#/submission?id=" + id);
+        } else {
+            notifications.notifyAdmins(approved ? "SUBMISSION_APPROVED" : "SUBMISSION_REJECTED", title, message, "#/submission?id=" + id);
+        }
         return toResponses(List.of(submission)).getFirst();
     }
 

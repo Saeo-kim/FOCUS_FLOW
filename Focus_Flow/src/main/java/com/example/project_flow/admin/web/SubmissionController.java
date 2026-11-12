@@ -112,7 +112,10 @@ public class SubmissionController {
     /** Always sent as a download, never rendered, so an uploaded HTML or SVG file cannot run in this site. */
     @GetMapping("/submission-files/{fileId}")
     public ResponseEntity<Resource> download(@PathVariable Long fileId) {
-        SubmissionService.Download d = service.download(fileId);
+        return asDownload(service.download(fileId));
+    }
+
+    static ResponseEntity<Resource> asDownload(SubmissionService.Download d) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .contentLength(d.file().getSizeBytes())

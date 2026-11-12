@@ -1,1 +1,65 @@
-/* MEMBER workspace only (member.html). Builds on app.css and shell.css. */
+/* MEMBER workspace only (member.html). Builds on app.css and shell.css with the same tokens. */
+
+/* What needs attention, right under the greeting */
+.attention-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.attention {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    color: inherit;
+}
+.attention:hover { text-decoration: none; filter: brightness(.98); }
+.attention.red { background: var(--red-soft); color: var(--red); }
+.attention.amber { background: var(--amber-soft); color: var(--amber); }
+
+.focus-actions { margin-top: 18px; }
+.focus-card .focus-actions .btn { margin-top: 0; }
+.stat.warn .stat-number { color: var(--red); }
+
+/* Task rows */
+.task.overdue { border-left: 3px solid var(--red); }
+.task > a.icon-btn { flex-shrink: 0; }
+
+/* Submission rows that link to their page */
+a.link-row { color: inherit; }
+a.link-row:hover { text-decoration: none; border-color: var(--accent); }
+.sub-row.needs-action { border-left: 3px solid var(--red); }
+.reject-line { display: flex; gap: 6px; align-items: flex-start; margin-top: 6px; color: var(--red); font-size: 13px; overflow-wrap: anywhere; }
+.reject-line .icon { margin-top: 2px; }
+.sub-when { white-space: nowrap; align-self: flex-start; }
+
+.sub-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.sub-count {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: inherit;
+}
+.sub-count:hover { text-decoration: none; border-color: var(--accent); }
+.sub-count strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+
+.review-note.pending { background: var(--amber-soft); color: var(--amber); }
+
+/* Projects */
+a.link-card { display: block; color: inherit; transition: border-color .15s; }
+a.link-card:hover { text-decoration: none; border-color: var(--accent); }
+
+/* Task details */
+.inline-field { flex-direction: row; align-items: center; gap: 8px; }
+.inline-field select { width: 150px; }
+.step-note { margin-top: 2px; overflow-wrap: anywhere; }
+.step-link { font-weight: 600; }
+
+@media (max-width: 560px) {
+    .sub-counts { grid-template-columns: 1fr 1fr 1fr; }
+    .sub-when { display: none; }
+    .inline-field select { width: 100%; }
+}
