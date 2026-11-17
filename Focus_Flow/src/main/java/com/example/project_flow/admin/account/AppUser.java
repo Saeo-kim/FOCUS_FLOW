@@ -57,6 +57,27 @@ public class AppUser {
 
     private LocalDateTime lastLoginAt;
 
+    /** Null on older rows means HUMAN. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private AccountKind kind;
+
+    /** Job title, such as "Exam Coach". Free text, separate from the role, which sets permissions. */
+    @Column(length = 60)
+    private String title;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private Department department;
+
+    /** One emoji or up to two letters shown in the avatar circle. Null shows the first letter of the name. */
+    @Column(length = 16)
+    private String avatar;
+
+    /** Avatar background as #rrggbb. */
+    @Column(length = 7)
+    private String avatarColor;
+
     protected AppUser() {
     }
 
@@ -74,6 +95,17 @@ public class AppUser {
     public void changeEmail(String email) { this.email = email; }
     public void setActive(boolean active) { this.active = active; }
     public void signedIn(LocalDateTime at) { this.lastLoginAt = at; }
+
+    public void assignJob(AccountKind kind, String title, Department department) {
+        this.kind = kind;
+        this.title = title;
+        this.department = department;
+    }
+
+    public void changeAvatar(String avatar, String avatarColor) {
+        this.avatar = avatar;
+        this.avatarColor = avatarColor;
+    }
 
     public void changePassword(String passwordHash) {
         this.passwordHash = passwordHash;
@@ -106,4 +138,9 @@ public class AppUser {
     public LocalDateTime getInviteExpiresAt() { return inviteExpiresAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
+    public AccountKind getKind() { return kind == null ? AccountKind.HUMAN : kind; }
+    public String getTitle() { return title; }
+    public Department getDepartment() { return department; }
+    public String getAvatar() { return avatar; }
+    public String getAvatarColor() { return avatarColor; }
 }

@@ -61,7 +61,7 @@ public class AccountController {
 
     @PutMapping("/profile")
     public UserResponse profile(@Valid @RequestBody ProfileRequest body, HttpServletRequest request) {
-        return UserResponse.from(accounts.rename(UserSession.user(request).getId(), body.displayName()));
+        return UserResponse.from(accounts.updateProfile(UserSession.user(request).getId(), body.displayName(), body.avatar(), body.avatarColor()));
     }
 
     @PutMapping("/password")

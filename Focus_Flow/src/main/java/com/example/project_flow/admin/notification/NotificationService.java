@@ -53,11 +53,20 @@ public class NotificationService {
         this.clock = clock;
     }
 
+    /** Type of the notices an administrator posts to everyone. */
+    public static final String ANNOUNCEMENT = "ANNOUNCEMENT";
+
+    /**
+     * {@code audience} says who a notice is for, which also sets its color in the bell menu:
+     * ANNOUNCEMENT (everyone), ADMIN (administrators only) or PERSONAL (just you).
+     */
     public record NotificationResponse(Long id, String type, String title, String message, String link,
-                                       boolean read, LocalDateTime createdAt) {
+                                       boolean read, LocalDateTime createdAt, String audience) {
         static NotificationResponse from(Notification n) {
+            String audience = ANNOUNCEMENT.equals(n.getType()) ? "ANNOUNCEMENT"
+                    : n.getRecipientUserId() == null ? "ADMIN" : "PERSONAL";
             return new NotificationResponse(n.getId(), n.getType(), n.getTitle(), n.getMessage(), n.getLink(),
-                    n.getReadAt() != null, n.getCreatedAt());
+                    n.getReadAt() != null, n.getCreatedAt(), audience);
         }
     }
 
@@ -68,6 +77,13 @@ public class NotificationService {
     @Transactional
     public void notifyAdmins(String type, String title, String message, String link) {
         notifications.save(new Notification(null, type, title, message, link, null, LocalDateTime.now(clock)));
+    }
+
+    /** Sends one copy to each listed person, so each can mark it read on their own. */
+    @Transactional
+    public void announce(List<Long> userIds, String title, String message) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        userIds.forEach(id -> notifications.save(new Notification(id, ANNOUNCEMENT, title, message, null, null, now)));
     }
 
     /** Adds a notice for one person only. */
