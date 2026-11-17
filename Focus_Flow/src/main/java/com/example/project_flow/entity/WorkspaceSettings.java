@@ -32,6 +32,17 @@ public class WorkspaceSettings {
         this.starterProjectSeeded = true;
     }
 
+    /** Set once the JPA exam study plan is created, so deleting it never brings it back. */
+    private Boolean studyPlanSeeded;
+
+    public boolean isStudyPlanSeeded() {
+        return Boolean.TRUE.equals(studyPlanSeeded);
+    }
+
+    public void markStudyPlanSeeded() {
+        this.studyPlanSeeded = true;
+    }
+
     public void update(String displayName, int dailyTargetMinutes) {
         this.displayName = displayName;
         this.dailyTargetMinutes = dailyTargetMinutes;
