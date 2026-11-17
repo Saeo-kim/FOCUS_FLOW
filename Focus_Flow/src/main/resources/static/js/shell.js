@@ -22,6 +22,57 @@ const FF = (() => {
         alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
     });
 
+    /* ---------- Team identity: department, title, avatar ---------- */
+
+    /** Same order and keys as Department.java. */
+    const DEPARTMENTS = {
+        STRATEGY_PLANNING: "Strategy & Planning",
+        OPERATIONS: "Operations",
+        ENGINEERING: "Engineering",
+        DESIGN_PRODUCT: "Design & Product",
+        MARKETING_SALES: "Marketing & Sales",
+        FINANCE_ACCOUNTING: "Finance & Accounting",
+        LEGAL_COMPLIANCE: "Legal & Compliance",
+        PEOPLE_HR: "People & HR",
+        LEARNING_CAREER: "Learning & Career",
+    };
+    /** Suggested titles per department; the title field still accepts anything. */
+    const TITLES = {
+        STRATEGY_PLANNING: ["Chief of Staff", "Study Planner", "Project Manager", "Strategy Analyst"],
+        OPERATIONS: ["Operations Manager", "Scheduler", "Assistant"],
+        ENGINEERING: ["Backend Engineer", "Frontend Engineer", "QA / AI Verification Engineer", "DevOps Engineer"],
+        DESIGN_PRODUCT: ["Product Designer", "UX Writer", "Product Manager"],
+        MARKETING_SALES: ["Marketing Lead", "Content Creator", "Sales Lead", "Brand Manager"],
+        FINANCE_ACCOUNTING: ["Accountant", "Finance Analyst", "Bookkeeper"],
+        LEGAL_COMPLIANCE: ["Legal Counsel", "Contract Manager", "Compliance Officer"],
+        PEOPLE_HR: ["HR Manager", "Recruiter", "Performance Reviewer"],
+        LEARNING_CAREER: ["Candidate", "Exam Coach", "Interview Coach", "Resume Editor", "English Editor"],
+    };
+    const AVATAR_COLORS = ["#ede9fe", "#dbeafe", "#dcfce7", "#fef3c7", "#ffe4e6", "#e0f2fe", "#f3e8ff", "#f1f5f9"];
+
+    /** The avatar circle: the chosen emoji or letters, else the first letter of the name. */
+    function avatar(user, size = 32) {
+        const text = user?.avatar || initial(user?.displayName || "?");
+        return h("span", {
+            class: "avatar" + (user?.kind === "AI" ? " ai" : ""),
+            style: `width:${size}px;height:${size}px;font-size:${Math.round(size * (user?.avatar ? 0.55 : 0.42))}px;` + (user?.avatarColor ? `background:${user.avatarColor};` : ""),
+            "aria-hidden": "true",
+        }, text);
+    }
+
+    /** "Exam Coach · Learning & Career", or "" when neither is set. */
+    function jobLine(user) {
+        return [user?.title, DEPARTMENTS[user?.department]].filter(Boolean).join(" · ");
+    }
+
+    /** Role tag, plus an AI tag for AI seats. */
+    function roleTags(user, long = false) {
+        return [
+            h("span", { class: "tag" + (user.role === "ADMIN" ? "" : " teal") }, user.role === "ADMIN" ? (long ? "Administrator" : "Admin") : "Member"),
+            user.kind === "AI" && h("span", { class: "tag ai" }, "AI"),
+        ].filter(Boolean);
+    }
+
     const MAX_FILE_MB = 50;
     const MAX_FILES = 10;
 
@@ -205,7 +256,7 @@ const FF = (() => {
         bellButton.replaceChildren(icon("bell", 20)); // replaceChildren would print a null argument as "null"
         if (count > 0) bellButton.append(h("span", { class: "badge" }, count > 99 ? "99+" : String(count)));
         bellButton.setAttribute("aria-label", count > 0 ? `Notifications, ${count} unread` : "Notifications");
-        profileButton.replaceChildren(user ? h("span", null, initial(user.displayName)) : icon("user", 18));
+        profileButton.replaceChildren(user ? avatar(user, 34) : icon("user", 18));
         profileButton.setAttribute("aria-label", user ? `Account: ${user.displayName}` : "Account");
         const foot = document.getElementById("workspaceName");
         // Admins keep the workspace name from Settings there (app.js fills it in).
@@ -244,16 +295,22 @@ const FF = (() => {
         bellPanel.replaceChildren(
             h("div", { class: "pop-head" },
                 h("h3", null, "Notifications"),
-                inbox.unread > 0 && h("button", {
-                    class: "link-btn", type: "button",
-                    onclick: async () => {
-                        try { await call("/api/me/notifications/read-all", { method: "POST" }); } catch (e) { toast(e.message, true); }
-                        loadInbox();
-                    },
-                }, "Mark all read")),
+                h("div", { class: "row tight" },
+                    me()?.role === "ADMIN" && h("button", { class: "link-btn", type: "button", onclick: () => { closePopovers(); openAnnounceDialog(); } }, "Announce"),
+                    inbox.unread > 0 && h("button", {
+                        class: "link-btn", type: "button",
+                        onclick: async () => {
+                            try { await call("/api/me/notifications/read-all", { method: "POST" }); } catch (e) { toast(e.message, true); }
+                            loadInbox();
+                        },
+                    }, "Mark all read"))),
+            h("div", { class: "notice-legend" },
+                h("span", { class: "aud announcement" }, "Everyone"),
+                me()?.role === "ADMIN" && h("span", { class: "aud admin" }, "Admins only"),
+                h("span", { class: "aud personal" }, "Just you")),
             inbox.items.length
                 ? h("div", { class: "notice-list" }, inbox.items.map(n => h("button", {
-                    class: "notice" + (n.read ? "" : " unread"), type: "button",
+                    class: "notice aud-" + (n.audience || "PERSONAL").toLowerCase() + (n.read ? "" : " unread"), type: "button",
                     onclick: () => {
                         closePopovers();
                         if (!n.read) call(`/api/me/notifications/${n.id}/read`, { method: "POST" }).then(loadInbox, () => {});
@@ -262,6 +319,7 @@ const FF = (() => {
                 },
                     h("span", { class: "notice-dot", "aria-hidden": "true" }),
                     h("span", { class: "notice-body" },
+                        h("span", { class: "notice-kind" }, { ANNOUNCEMENT: "Announcement · everyone", ADMIN: "Admins only" }[n.audience] || "For you"),
                         h("span", { class: "notice-title" }, n.title),
                         n.message && h("span", { class: "notice-msg" }, n.message),
                         h("span", { class: "notice-time" }, ago(n.createdAt))))))
@@ -273,11 +331,12 @@ const FF = (() => {
         if (!user) return;
         profilePanel.replaceChildren(h("div", null,
             h("div", { class: "profile-head" },
-                h("span", { class: "avatar-btn static", "aria-hidden": "true" }, initial(user.displayName)),
+                avatar(user, 40),
                 h("div", { class: "profile-id" },
                     h("strong", null, user.displayName),
-                    h("div", { class: "muted" }, "@" + user.username)),
-                h("span", { class: "tag" + (user.role === "ADMIN" ? "" : " teal") }, user.role === "ADMIN" ? "Admin" : "Member")),
+                    h("div", { class: "muted" }, "@" + user.username),
+                    jobLine(user) && h("div", { class: "muted small" }, jobLine(user))),
+                h("div", { class: "stack tight" }, ...roleTags(user))),
             profileLinks.map(([href, ic, label]) => h("a", { class: "menu-link", href, onclick: closePopovers }, icon(ic, 16), label)),
             h("div", { class: "menu-sep" }),
             h("button", { class: "menu-link danger", type: "button", onclick: signOut }, icon("logout", 16), "Sign out")));
@@ -315,10 +374,52 @@ const FF = (() => {
         ].filter(Boolean)));
     }
 
+    /** Administrators: one notice to every active account, shown in green. */
+    function openAnnounceDialog() {
+        const title = h("input", { type: "text", required: true, maxlength: 200, placeholder: "e.g. Final project presentation moved to Nov 30" });
+        const message = h("textarea", { maxlength: 500, rows: 3, placeholder: "Optional details" });
+        openModal(h("form", {
+            onsubmit: async event => {
+                event.preventDefault();
+                try {
+                    await call("/api/me/notifications/announce", { method: "POST", body: { title: title.value, message: message.value || null } });
+                    closeModal();
+                    toast("Announcement sent to everyone.");
+                    loadInbox();
+                } catch (e) { toast(e.message, true); }
+            },
+        },
+            h("h2", null, "Announce to everyone"),
+            h("p", { class: "muted" }, "Every active account, including AI seats, gets this in their bell, in green."),
+            h("div", { class: "form-grid" },
+                h("label", { class: "field full" }, "Headline", title),
+                h("label", { class: "field full" }, "Message", message)),
+            h("div", { class: "modal-actions" }, cancelButton(), h("button", { class: "btn primary", type: "submit" }, "Send announcement"))));
+    }
+
+    /** Emoji / letters plus a pastel background, with a live preview. Returns [element, read()]. */
+    function avatarPicker(user) {
+        let color = user.avatarColor || AVATAR_COLORS[0];
+        const text = h("input", { type: "text", maxlength: 16, value: user.avatar || "", placeholder: initial(user.displayName), "aria-label": "Avatar emoji or letters" });
+        const preview = h("span", { class: "avatar-preview" });
+        const paint = () => preview.replaceChildren(avatar({ ...user, avatar: text.value.trim() || null, avatarColor: color }, 64));
+        const swatches = h("div", { class: "swatches" }, AVATAR_COLORS.map(c => h("button", {
+            type: "button", class: "swatch" + (c === color ? " on" : ""), style: `background:${c}`, "aria-label": "Avatar color " + c,
+            onclick: event => { color = c; swatches.querySelectorAll(".swatch").forEach(s => s.classList.toggle("on", s === event.currentTarget)); paint(); },
+        })));
+        const quick = h("div", { class: "emoji-row" }, ["🦊", "🐯", "🦉", "🐳", "🌱", "🚀", "🎯", "📚", "🤖", "⚖️", "💼", "🎨"].map(e =>
+            h("button", { type: "button", class: "emoji-btn", onclick: () => { text.value = e; paint(); } }, e)));
+        text.addEventListener("input", paint);
+        paint();
+        return [h("div", { class: "avatar-picker" }, preview, h("div", { class: "stack tight grow" }, text, quick, swatches)),
+            () => ({ avatar: text.value.trim(), avatarColor: color })];
+    }
+
     /* ---------- Account page, the same for both roles ---------- */
 
     async function viewAccount() {
         const user = await ready();
+        const [picker, readAvatar] = avatarPicker(user);
         const pw = attrs => h("input", { type: "password", required: true, maxlength: 128, ...attrs });
         const displayName = h("input", { type: "text", required: true, maxlength: 60, value: user.displayName });
         const current = pw({ autocomplete: "current-password" });
@@ -330,14 +431,17 @@ const FF = (() => {
                 class: "card",
                 onsubmit: event => {
                     event.preventDefault();
-                    act(async () => setUser(await call("/api/auth/profile", { method: "PUT", body: { displayName: displayName.value } })), "Profile saved.");
+                    act(async () => setUser(await call("/api/auth/profile", { method: "PUT", body: { displayName: displayName.value, ...readAvatar() } })), "Profile saved.");
                 },
             },
-                sectionHead("Profile", h("span", { class: "tag" + (user.role === "ADMIN" ? "" : " teal") }, user.role === "ADMIN" ? "Administrator" : "Member")),
+                sectionHead("Profile", h("div", { class: "row tight" }, ...roleTags(user, true))),
                 h("div", { class: "stack" },
+                    h("div", { class: "field" }, "Avatar", picker),
                     h("label", { class: "field" }, "Name", displayName),
                     detailList([
                         ["Username", "@" + user.username],
+                        ["Title", user.title || "—"],
+                        ["Department", DEPARTMENTS[user.department] || "—"],
                         ["Email", user.email],
                         ["Member since", fmtStamp(user.createdAt)],
                         ["Last sign-in", fmtStamp(user.lastLoginAt)],
@@ -363,6 +467,7 @@ const FF = (() => {
 
     return {
         call, loadAuth, me, ready, setUser, signOut, change, loadInbox, mountHeader, buildNav, closePopovers, viewAccount,
+        DEPARTMENTS, TITLES, avatar, jobLine, roleTags,
         fmtBytes, fmtStamp, ago, initial, filePicker, fileList, historyList, subTag,
         SUB_STATUS, EVENT_LABEL, MAX_FILE_MB, MAX_FILES,
     };

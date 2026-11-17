@@ -8,6 +8,7 @@ import com.example.project_flow.admin.account.AccountDtos.MemberCreateRequest;
 import com.example.project_flow.admin.account.AccountDtos.MemberUpdateRequest;
 import com.example.project_flow.admin.account.AccountDtos.SetupRequest;
 import com.example.project_flow.admin.account.AccountDtos.UserResponse;
+import com.example.project_flow.admin.notification.NotificationService;
 import com.example.project_flow.exception.ConflictException;
 import com.example.project_flow.exception.NotFoundException;
 import com.example.project_flow.service.ActivityLogService;
@@ -41,15 +42,18 @@ public class AccountService {
     private final AppUserRepository users;
     private final PasswordHasher hasher;
     private final ActivityLogService activity;
+    private final NotificationService notifications;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     /** key -> {failures, lockedUntilMillis}; in memory, so a restart clears it. */
     private final Map<String, long[]> failures = new ConcurrentHashMap<>();
 
-    public AccountService(AppUserRepository users, PasswordHasher hasher, ActivityLogService activity, Clock clock) {
+    public AccountService(AppUserRepository users, PasswordHasher hasher, ActivityLogService activity,
+                          NotificationService notifications, Clock clock) {
         this.users = users;
         this.hasher = hasher;
         this.activity = activity;
+        this.notifications = notifications;
         this.clock = clock;
     }
 
@@ -125,6 +129,11 @@ public class AccountService {
         user.signedIn(LocalDateTime.now(clock));
         activity.record(firstTime ? "ACCOUNT_JOINED" : "ACCOUNT_PASSWORD_RESET",
                 user.getDisplayName() + (firstTime ? " joined with an invitation" : " set a new password with a reset code"));
+        if (firstTime) {
+            notifications.notifyAdmins("MEMBER_JOINED", user.getDisplayName() + " joined the team",
+                    "@" + user.getUsername() + (user.getTitle() == null ? "" : " · " + user.getTitle())
+                            + (user.getKind() == AccountKind.AI ? " · AI seat" : ""), "#/members");
+        }
         return user;
     }
 
@@ -149,6 +158,7 @@ public class AccountService {
         UserRole role = request.role() == null ? UserRole.MEMBER : request.role();
         AppUser user = new AppUser(username, request.displayName().trim(), unusableHash(), role, LocalDateTime.now(clock));
         user.changeEmail(email);
+        user.assignJob(request.kind() == null ? AccountKind.HUMAN : request.kind(), References.clean(request.title()), request.department());
         users.save(user);
         activity.record("ACCOUNT_INVITED", "Invited " + user.getDisplayName() + " (@" + username + ") as " + (role == UserRole.ADMIN ? "administrator" : "member"));
         return issue(user, true);
@@ -180,6 +190,7 @@ public class AccountService {
         }
         user.rename(request.displayName().trim());
         user.changeEmail(email);
+        user.assignJob(request.kind() == null ? user.getKind() : request.kind(), References.clean(request.title()), request.department());
         if (request.active() != null && request.active() != user.isActive()) {
             activity.record(request.active() ? "ACCOUNT_REACTIVATED" : "ACCOUNT_DEACTIVATED",
                     (request.active() ? "Reactivated " : "Deactivated ") + user.getDisplayName() + " (@" + user.getUsername() + ")");
@@ -189,9 +200,12 @@ public class AccountService {
     }
 
     @Transactional
-    public AppUser rename(Long userId, String displayName) {
+    public AppUser updateProfile(Long userId, String displayName, String avatar, String avatarColor) {
         AppUser user = require(userId);
         user.rename(displayName.trim());
+        if (avatar != null || avatarColor != null) {
+            user.changeAvatar(References.clean(avatar), References.clean(avatarColor));
+        }
         return user;
     }
 

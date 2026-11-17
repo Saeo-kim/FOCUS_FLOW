@@ -373,16 +373,42 @@
             h("div", { class: "modal-actions" }, h("button", { class: "btn primary", type: "button", onclick: () => { closeModal(); refresh(); } }, "Done"))));
     }
 
+    /**
+     * Seat type, department and title for the invite and edit dialogs. The title suggestions follow
+     * the chosen department, and any other title can be typed. Returns [fields, read()].
+     */
+    function jobFields(u = {}) {
+        const kind = h("select", null,
+            h("option", { value: "HUMAN" }, "Person"),
+            h("option", { value: "AI" }, "AI teammate — a seat you operate now and connect to an AI later"));
+        kind.value = u.kind || "HUMAN";
+        const department = h("select", null, h("option", { value: "" }, "— None —"),
+            Object.entries(FF.DEPARTMENTS).map(([value, label]) => h("option", { value }, label)));
+        department.value = u.department || "";
+        const listId = "title-options-" + Math.random().toString(36).slice(2);
+        const options = h("datalist", { id: listId });
+        const title = h("input", { type: "text", maxlength: 60, value: u.title || "", list: listId, placeholder: "e.g. Exam Coach" });
+        const fill = () => options.replaceChildren(...(FF.TITLES[department.value] || Object.values(FF.TITLES).flat()).map(t => h("option", { value: t })));
+        department.addEventListener("change", fill);
+        fill();
+        return [[
+            h("label", { class: "field full" }, "Seat", kind),
+            h("label", { class: "field" }, "Department", department),
+            h("label", { class: "field" }, "Title", title, options),
+        ], () => ({ kind: kind.value, department: department.value || null, title: title.value.trim() || null })];
+    }
+
     function openInviteDialog() {
         const displayName = h("input", { type: "text", required: true, maxlength: 60 });
         const username = h("input", { type: "text", required: true, maxlength: 40, pattern: "[A-Za-z0-9._\\-]{3,40}", placeholder: "e.g. jiyoung.park" });
         const email = h("input", { type: "email", maxlength: 120, placeholder: "optional" });
         const role = h("select", { value: "MEMBER" }, h("option", { value: "MEMBER" }, "Member — does assigned work"), h("option", { value: "ADMIN" }, "Administrator — manages everything"));
+        const [job, readJob] = jobFields();
         openModal(h("form", {
             onsubmit: async event => {
                 event.preventDefault();
                 try {
-                    const issued = await adminApi("/api/admin/users", { method: "POST", body: { displayName: displayName.value, username: username.value, email: email.value || null, role: role.value } });
+                    const issued = await adminApi("/api/admin/users", { method: "POST", body: { displayName: displayName.value, username: username.value, email: email.value || null, role: role.value, ...readJob() } });
                     showCode("Invitation created", issued);
                 } catch (error) { toast(error.message, true); }
             },
@@ -392,7 +418,9 @@
                 h("label", { class: "field full" }, "Name", displayName),
                 h("label", { class: "field" }, "Username", username),
                 h("label", { class: "field" }, "Email", email),
-                h("label", { class: "field full" }, "Role", role)),
+                h("label", { class: "field full" }, "Role (what they may do)", role),
+                ...job),
+            h("p", { class: "muted small" }, "The invitation code is shown only once, right after you create it. Copy it before closing."),
             h("div", { class: "modal-actions" }, cancelButton(), h("button", { class: "btn primary", type: "submit" }, "Create invitation"))));
     }
 
@@ -401,10 +429,11 @@
         const email = h("input", { type: "email", maxlength: 120, value: u.email || "" });
         const active = h("input", { type: "checkbox", disabled: u.id === me.id });
         active.checked = u.active;
+        const [job, readJob] = jobFields(u);
         openModal(h("form", {
             onsubmit: async event => {
                 event.preventDefault();
-                const ok = await adminAct(() => adminApi(`/api/admin/users/${u.id}`, { method: "PUT", body: { displayName: displayName.value, email: email.value || null, active: active.checked } }), "Member updated.");
+                const ok = await adminAct(() => adminApi(`/api/admin/users/${u.id}`, { method: "PUT", body: { displayName: displayName.value, email: email.value || null, active: active.checked, ...readJob() } }), "Member updated.");
                 if (ok) closeModal();
             },
         },
@@ -412,6 +441,7 @@
             h("div", { class: "form-grid" },
                 h("label", { class: "field full" }, "Name", displayName),
                 h("label", { class: "field full" }, "Email", email),
+                ...job,
                 h("label", { class: "field full check-field" }, active, u.id === me.id ? "Active (you can't deactivate yourself)" : "Active — can sign in")),
             h("div", { class: "modal-actions" }, cancelButton(), h("button", { class: "btn primary", type: "submit" }, "Save"))));
     }
@@ -468,10 +498,11 @@
                     const [state, tag] = accountState(u);
                     return h("tr", null,
                         h("td", null, h("div", { class: "person" },
-                            h("span", { class: "avatar-btn static small", "aria-hidden": "true" }, FF.initial(u.displayName)),
+                            FF.avatar(u, 30),
                             h("div", null, h("strong", null, u.displayName), u.id === me.id && h("span", { class: "muted" }, " (you)"),
-                                h("div", { class: "muted" }, "@" + u.username + (u.email ? ` · ${u.email}` : ""))))),
-                        h("td", null, h("span", { class: "tag" + (u.role === "ADMIN" ? "" : " teal") }, u.role === "ADMIN" ? "Admin" : "Member")),
+                                h("div", { class: "muted" }, "@" + u.username + (u.email ? ` · ${u.email}` : "")),
+                                FF.jobLine(u) && h("div", { class: "muted small" }, FF.jobLine(u))))),
+                        h("td", null, h("div", { class: "row tight" }, ...FF.roleTags(u))),
                         h("td", null, h("span", { class: "tag " + tag }, state)),
                         h("td", { class: "wrap" }, projectNames(u).join(", ") || h("span", { class: "muted" }, "—")),
                         h("td", null, mine.length

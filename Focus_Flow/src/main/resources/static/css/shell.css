@@ -212,3 +212,39 @@ input[type="password"], input[type="search"] {
     .sub-row { align-items: flex-start; }
     .history .tag { min-width: 0; }
 }
+
+/* ---------- Avatars and team identity ---------- */
+.avatar {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    border-radius: 50%; background: var(--accent-soft); color: var(--accent-text);
+    font-weight: 700; line-height: 1; user-select: none;
+}
+.avatar.ai { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #c4b5fd; }
+#profileButton { padding: 0; overflow: hidden; }
+.tag.ai { background: #f3e8ff; color: #7e22ce; }
+.row.tight { gap: 6px; }
+.stack.tight { gap: 6px; }
+.grow { flex: 1; min-width: 0; }
+.muted.small { font-size: 12px; }
+.avatar-picker { display: flex; gap: 14px; align-items: flex-start; }
+.swatches, .emoji-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; padding: 0; }
+.swatch.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.emoji-btn { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 2px 6px; font-size: 16px; cursor: pointer; }
+.emoji-btn:hover { border-color: var(--accent); }
+
+/* ---------- Notification colors: who a notice is for ---------- */
+.notice { margin-bottom: 4px; border-left: 3px solid transparent; }
+.notice.aud-announcement { background: #f0fdf4; border-left-color: #86efac; }
+.notice.aud-admin { background: #fff1f2; border-left-color: #fda4af; }
+.notice.aud-personal { background: #ffffff; border-left-color: var(--border); }
+.notice.aud-announcement:hover { background: #dcfce7; }
+.notice.aud-admin:hover { background: #ffe4e6; }
+.notice-kind { font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-2); }
+.aud-announcement .notice-kind { color: #15803d; }
+.aud-admin .notice-kind { color: #be123c; }
+.notice-legend { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 8px 8px; }
+.aud { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+.aud.announcement { background: #f0fdf4; border-color: #86efac; }
+.aud.admin { background: #fff1f2; border-color: #fda4af; }
+.aud.personal { background: #fff; }
