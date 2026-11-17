@@ -303,3 +303,49 @@ Forgotten passwords go through the administrator: **Members → Reset access** i
 ### Database changes
 
 Only new tables were added (`app_users`, `project_members`, `task_assignments`, `submissions`, `submission_files`, `submission_events`, `notifications`). None has a foreign key into an existing table, and no existing table or column was changed. Uploaded files are stored outside the project in `%USERPROFILE%\focus_flow_uploads`.
+
+---
+
+## Appendix: AI Team (Owner's Office as CFO)
+
+FOCUS FLOW has AI teammates alongside people. Each one has a seat in the member list (kind **AI**), a title, a department and written responsibilities. The first teammate is **Owner's Office**, the CFO (Finance & Accounting). It is a separate application that keeps the financial records. FOCUS FLOW never copies them.
+
+| Seat | Title | Department | Connected application |
+| --- | --- | --- | --- |
+| Owner's Office | CFO (Chief Financial Officer) | Finance & Accounting | Owner's Office (`owners-office`, port 4320 on this PC) |
+
+### Set up the connection
+
+1. In Owner's Office, set `OFFICE_AGENT_TOKEN` to a random string of at least 32 characters, then start it (see its README). Leave the variable unset and the agent API stays off.
+2. Put the same value in FOCUS FLOW's `application-local.properties` as `owners-office.token=...`, or set the environment variable `OWNERS_OFFICE_TOKEN` before starting FOCUS FLOW.
+3. Open **AI Team** in the admin workspace. The CFO shows **Connected** when both sides agree.
+
+Without a token the CFO still appears in the member list, but nothing is sent. The token is a secret: keep it out of Git, as with the database password. It only ever goes to `127.0.0.1` and is never shown in the UI or in error messages.
+
+### How work reaches the CFO
+
+| You do | What happens |
+| --- | --- |
+| Assign a task to the CFO (Task Assignment) | The task is sent to Owner's Office and turns **In progress** |
+| Mention **@CFO** in a task comment (admin or member) | A request is made from that comment; the CFO's answer is posted as a comment |
+| **Ask the CFO** on the AI Team page | A task is created and assigned to the CFO, then sent. You can choose a report type or let the CFO choose from the words you use |
+| **Sync now** on the AI Team page | Pulls the latest progress and sends anything still waiting |
+
+When the report is ready, the CFO posts it as a comment on the task, the task becomes **Completed** (or **Review** if it still has open work steps), and administrators get a notification. If the CFO cannot finish, the task becomes **Blocked** and the comment says so.
+
+Reports cover monthly reports, profit and loss, cash flow and runway, bookkeeping status, tax-preparation material (not filing), investment account totals (balances entered in Owner's Office, not market prices), planning, and risk review. Each report states its figures, its basis, and its limits.
+
+### Data and safety
+
+- Owner's Office returns **aggregates only** (totals, findings, recommendations). Account names, account notes and ledger lines never cross over. A test checks this with real data.
+- FOCUS FLOW keeps the request, its status and the report text. It does not keep ledger rows.
+- The CFO seat has no password and no access code. It cannot sign in, and it cannot be turned into a person's account.
+- If Owner's Office is closed, a request waits as **Waiting to send** and is retried by the background sync (every minute by default, `owners-office.sync-interval-ms`). Each request is sent with a unique reference, so a retry never creates a duplicate.
+
+### Adding more AI teammates later
+
+Add an entry to `aiteam/AiTeamCatalog.java` (key, username, title, department, responsibilities, avatar). Its seat is created at the next start, and assignment and @mentions work through the same path. The planned roles are CTO (Engineering), COO (Operations), CMO (Marketing & Sales), CPO (Design & Product) and HR Manager (People & HR). Each needs an application that speaks the same agent API, or it can be built inside FOCUS FLOW.
+
+### Database changes
+
+Only new tables were added: `ai_requests` and `task_comments`. No existing table or column changed. The CFO seat is an ordinary `app_users` row with `kind = AI`.

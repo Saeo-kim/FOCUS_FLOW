@@ -102,6 +102,21 @@ public class AppUser {
         this.department = department;
     }
 
+    /**
+     * Makes this account an AI seat: no password can match and no invitation code is issued, so it
+     * can never sign in. Work reaches it through task assignment instead.
+     */
+    public void markAiSeat(String unusableHash) {
+        this.passwordHash = unusableHash;
+        this.passwordSet = false;
+        this.inviteCodeHash = null;
+        this.inviteExpiresAt = null;
+    }
+
+    public boolean isAi() {
+        return getKind() == AccountKind.AI;
+    }
+
     public void changeAvatar(String avatar, String avatarColor) {
         this.avatar = avatar;
         this.avatarColor = avatarColor;
