@@ -515,6 +515,7 @@ const PROJECT_TAB_VIEWS = {
             h("div", { class: "card" },
                 sectionHead("Project Information", h("button", { class: "btn", type: "button", onclick: () => openProjectDialog(project) }, icon("pencil", 16), "Edit")),
                 detailList([
+                    ["Purpose", project.purpose],
                     ["Description", project.description], ["Type", project.projectType],
                     ["Team", [project.teamName, project.teamNumber != null ? `No. ${project.teamNumber}` : null].filter(Boolean).join(" · ")],
                     ["Project period", dateRange(project.startDate, project.dueDate)],

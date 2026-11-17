@@ -84,6 +84,7 @@ public class ProjectService {
         project.updateDetails(References.clean(q.projectType()), References.clean(q.teamName()), q.teamNumber(),
                 q.startDate(), q.devStartDate(), q.devEndDate(),
                 References.clean(q.techStack()), References.clean(q.serviceFeatures()));
+        project.changePurpose(References.clean(q.purpose()));
     }
 
     private Map<Long, long[]> counts() {

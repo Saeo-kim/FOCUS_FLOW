@@ -58,6 +58,10 @@ public class Project {
     @Column(length = 1000)
     private String serviceFeatures;
 
+    /** Why this project matters: the mission behind the work, shown above every task list. */
+    @Column(length = 2000)
+    private String purpose;
+
     protected Project() {
     }
 
@@ -92,6 +96,11 @@ public class Project {
     public LocalDate getDevEndDate() { return devEndDate; }
     public String getTechStack() { return techStack; }
     public String getServiceFeatures() { return serviceFeatures; }
+    public String getPurpose() { return purpose; }
+
+    public void changePurpose(String purpose) {
+        this.purpose = purpose;
+    }
 
     public Long getId() {
         return id;

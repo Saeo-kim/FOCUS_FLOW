@@ -34,7 +34,9 @@ public final class ProjectDtos {
             @Size(max = 1000, message = "Tech stack is too long.")
             String techStack,
             @Size(max = 1000, message = "Service features are too long.")
-            String serviceFeatures) {
+            String serviceFeatures,
+            @Size(max = 2000, message = "Purpose is too long.")
+            String purpose) {
     }
 
     public record ProjectResponse(
@@ -53,7 +55,8 @@ public final class ProjectDtos {
             LocalDate devStartDate,
             LocalDate devEndDate,
             String techStack,
-            String serviceFeatures) {
+            String serviceFeatures,
+            String purpose) {
 
         public static ProjectResponse from(Project project, long taskCount, long completedTaskCount) {
             return new ProjectResponse(
@@ -72,7 +75,8 @@ public final class ProjectDtos {
                     project.getDevStartDate(),
                     project.getDevEndDate(),
                     project.getTechStack(),
-                    project.getServiceFeatures());
+                    project.getServiceFeatures(),
+                    project.getPurpose());
         }
     }
 }

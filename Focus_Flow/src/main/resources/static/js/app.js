@@ -263,6 +263,8 @@ function openProjectDialog(project) {
     const devEnd = h("input", { type: "date", value: project?.devEndDate || "" });
     const techStack = h("textarea", { maxlength: 1000, value: project?.techStack || "" });
     const features = h("textarea", { maxlength: 1000, value: project?.serviceFeatures || "" });
+    const purpose = h("textarea", { maxlength: 2000, rows: 4, value: project?.purpose || "",
+        placeholder: "Why does this project matter? What changes for you when it is done?" });
 
     const form = h("form", {
         onsubmit: async event => {
@@ -272,7 +274,7 @@ function openProjectDialog(project) {
                 projectType: projectType.value, teamName: teamName.value,
                 teamNumber: teamNumber.value === "" ? null : Number(teamNumber.value),
                 startDate: start.value || null, devStartDate: devStart.value || null, devEndDate: devEnd.value || null,
-                techStack: techStack.value, serviceFeatures: features.value,
+                techStack: techStack.value, serviceFeatures: features.value, purpose: purpose.value,
             };
             const saved = await act(
                 () => project ? api(`/api/projects/${project.id}`, { method: "PUT", body }) : api("/api/projects", { method: "POST", body }),
@@ -283,6 +285,7 @@ function openProjectDialog(project) {
         h("h2", null, project ? "Edit project" : "New project"),
         h("div", { class: "form-grid" },
             h("label", { class: "field full" }, "Name", name),
+            h("label", { class: "field full" }, "Purpose (why this matters)", purpose),
             h("label", { class: "field full" }, "Description", description),
             h("label", { class: "field" }, "Status", status),
             h("label", { class: "field" }, "Project type", projectType),

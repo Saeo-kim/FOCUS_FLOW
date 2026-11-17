@@ -434,6 +434,7 @@
                             now && h("span", { class: "tag green" }, `Now: ${now.name}`))),
                     h("button", { class: "btn primary", type: "button", onclick: () => openSubmitDialog({ projectId: p.id }) }, icon("upload", 16), "Submit work")),
                 detailList([
+                    ["Why it matters", p.purpose],
                     ["About", p.description],
                     ["Schedule", p.startDate || p.dueDate ? `${p.startDate ? fmtDate(p.startDate) : "?"} – ${p.dueDate ? fmtDate(p.dueDate) : "?"}` : null],
                     ["Development", p.devStartDate ? `${fmtDate(p.devStartDate)} – ${p.devEndDate ? fmtDate(p.devEndDate) : "?"}` : null],

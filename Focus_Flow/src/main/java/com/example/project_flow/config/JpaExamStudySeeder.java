@@ -107,6 +107,11 @@ public class JpaExamStudySeeder implements ApplicationRunner {
         project.updateDetails("Exam Study", "개인", null, date(11, 18), date(11, 18), date(11, 28),
                 "Java 21, Spring Boot 3.4, Spring Data JPA, Spring Security, Thymeleaf, MySQL 8, JUnit 5",
                 "A 연관관계 매핑, B 지연로딩·프록시·N+1, C 영속성 컨텍스트·변경감지, D JPQL·Repository, 결함 사건 9건");
+        project.changePurpose("왜 하는가: 시험 점수가 아니라 \"AI가 짠 코드를 내가 검증할 수 있는 사람\"이 되기 위해서다.\n"
+                + "1) JPA는 Spring 백엔드 채용 공고 대부분에 나오고, N+1은 면접 단골 질문이다.\n"
+                + "2) defect-lab의 9개 사건은 실제 서비스에서 돈과 신뢰를 잃게 만드는 결함이다 (중복 결제, 개인정보 노출).\n"
+                + "3) 이것을 설명할 수 있으면 AI에게 일을 시키는 사람이 되고, 못 하면 AI가 준 코드를 그대로 붙여넣는 사람이 된다.\n"
+                + "끝났을 때의 모습: 코드 한 줄을 보고 \"여기서 SQL이 몇 번 나간다\"고 말할 수 있다.");
         return projects.save(project);
     }
 
