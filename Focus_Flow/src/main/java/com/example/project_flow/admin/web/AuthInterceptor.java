@@ -51,6 +51,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (PUBLIC_PATHS.contains(path)) {
             return true;
         }
+        // Integration endpoints authenticate with their own service token (see LegalIntegrationController).
+        if (path.startsWith("/api/integration/")) {
+            return true;
+        }
         AppUser user = accounts.activeUser(UserSession.userId(request)).orElse(null);
         if (user == null) {
             UserSession.signOut(request); // a deactivated or deleted account loses its session at once

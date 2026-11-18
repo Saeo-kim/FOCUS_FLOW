@@ -1,6 +1,7 @@
 package com.example.project_flow.controller;
 
 import com.example.project_flow.exception.ConflictException;
+import com.example.project_flow.exception.ForbiddenException;
 import com.example.project_flow.exception.NotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public Map<String, String> conflict(ConflictException exception) {
+        return Map.of("message", exception.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Map<String, String> forbidden(ForbiddenException exception) {
         return Map.of("message", exception.getMessage());
     }
 

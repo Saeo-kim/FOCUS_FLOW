@@ -69,6 +69,17 @@ public class ComplianceReview {
 
     private LocalDateTime completedAt;
 
+    /** Whether the issue behind this review has been resolved. Null means not yet tracked (treated as open). */
+    private Boolean issueResolved;
+
+    private LocalDateTime issueResolvedAt;
+
+    @Column(length = 60)
+    private String issueResolvedByName;
+
+    @Column(columnDefinition = "TEXT")
+    private String issueNote;
+
     protected ComplianceReview() {
     }
 
@@ -105,6 +116,15 @@ public class ComplianceReview {
         this.completedAt = ReviewStatus.COMPLETED.contains(next) ? (completedAt == null ? now : completedAt) : null;
     }
 
+    /** Marks the tracked issue resolved or open. The person and time are kept with it. */
+    public void trackIssue(boolean resolved, String byName, String note, LocalDateTime now) {
+        this.issueResolved = resolved;
+        this.issueResolvedAt = resolved ? now : null;
+        this.issueResolvedByName = resolved ? byName : null;
+        this.issueNote = note;
+        this.updatedAt = now;
+    }
+
     public void touch(LocalDateTime now) {
         this.updatedAt = now;
     }
@@ -124,4 +144,8 @@ public class ComplianceReview {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public LocalDateTime getCompletedAt() { return completedAt; }
+    public boolean isIssueResolved() { return Boolean.TRUE.equals(issueResolved); }
+    public LocalDateTime getIssueResolvedAt() { return issueResolvedAt; }
+    public String getIssueResolvedByName() { return issueResolvedByName; }
+    public String getIssueNote() { return issueNote; }
 }

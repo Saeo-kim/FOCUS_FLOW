@@ -1,8 +1,10 @@
 package com.example.project_flow.legal;
 
 import com.example.project_flow.admin.account.AppUser;
+import com.example.project_flow.admin.account.UserRole;
 import com.example.project_flow.entity.Priority;
 import com.example.project_flow.exception.ConflictException;
+import com.example.project_flow.exception.ForbiddenException;
 import com.example.project_flow.exception.NotFoundException;
 import com.example.project_flow.service.ActivityLogService;
 import org.springframework.stereotype.Service;
@@ -26,7 +28,9 @@ import java.util.Set;
 @Service
 public class LegalComplianceService {
 
-    public static final String DISCLAIMER = "Decision support only. This is not legal advice and does not replace review by a qualified lawyer.";
+    public static final String DISCLAIMER = "Decision support only. This is not legal advice, and it does not decide anything. "
+            + "A person authorized by the owner makes the final decision.";
+    private static final int MIN_REASONING = 10;
     private static final int SPECIALIST_COUNT = 5;
     private static final int MAX_TEXT = 4000;
 
@@ -44,7 +48,8 @@ public class LegalComplianceService {
     public record ReviewView(Long id, String category, String categoryLabel, String title, String documentRef, String description,
                              Priority priority, LocalDate deadline, String status, boolean overdue, String findingsSummary,
                              String recommendedAction, List<FindingView> findings, LocalDateTime createdAt,
-                             LocalDateTime updatedAt, LocalDateTime completedAt) {
+                             LocalDateTime updatedAt, LocalDateTime completedAt, boolean issueResolved,
+                             LocalDateTime issueResolvedAt, String issueResolvedByName, String issueNote) {
     }
 
     public record RiskItem(Long reviewId, String reviewTitle, String functionTitle, RiskLevel riskLevel, String finding) {
@@ -54,9 +59,24 @@ public class LegalComplianceService {
                           List<RiskItem> topRisks) {
     }
 
-    public record DecisionView(Long reviewId, String recommendation, int specialistsReviewed, int specialistsTotal,
-                               RiskLevel highestRisk, boolean professionalReviewRequired, List<String> conflicts,
-                               List<RiskItem> prioritizedRisks, String executiveSummary, String disclaimer) {
+    public record DecisionView(Long reviewId, DecisionState state, boolean approvalAvailable, int specialistsReviewed,
+                               int specialistsTotal, RiskLevel highestRisk, boolean humanReviewRequired,
+                               List<String> conflicts, List<RiskItem> prioritizedRisks, String executiveSummary,
+                               String disclaimer) {
+    }
+
+    public record HumanDecisionRequest(String outcome, String reasoning) {
+    }
+
+    public record HumanDecisionView(Long id, Long reviewId, String outcome, String reasoning, String decidedByName,
+                                    DecisionState assistantState, LocalDateTime decidedAt) {
+    }
+
+    public record IssueRequest(boolean resolved, String note) {
+    }
+
+    /** Everything Owner's Office needs to show one review, for a human to decide. Read-only. */
+    public record ReviewPackage(ReviewView review, DecisionView assistant, List<HumanDecisionView> humanDecisions) {
     }
 
     public record ReviewRequest(String category, String title, String documentRef, String description, Priority priority,
@@ -71,17 +91,19 @@ public class LegalComplianceService {
     private final OrgPositionFunctionRepository functions;
     private final ComplianceReviewRepository reviews;
     private final ComplianceFindingRepository findings;
+    private final HumanDecisionRepository decisions;
     private final ActivityLogService activity;
     private final Clock clock;
 
     public LegalComplianceService(LegalCatalog catalog, OrgPositionRepository positions, OrgPositionFunctionRepository functions,
                                   ComplianceReviewRepository reviews, ComplianceFindingRepository findings,
-                                  ActivityLogService activity, Clock clock) {
+                                  HumanDecisionRepository decisions, ActivityLogService activity, Clock clock) {
         this.catalog = catalog;
         this.positions = positions;
         this.functions = functions;
         this.reviews = reviews;
         this.findings = findings;
+        this.decisions = decisions;
         this.activity = activity;
         this.clock = clock;
     }
@@ -202,13 +224,32 @@ public class LegalComplianceService {
 
     /* ---------- Decision Assistant ---------- */
 
+    /**
+     * Readiness of a review. Rules, in order:
+     * any HIGH finding -> BLOCK (human review first, approval unavailable);
+     * otherwise a missing specialist review, or none at all -> INCOMPLETE (approval unavailable);
+     * otherwise a MEDIUM finding -> CLARIFICATION_REQUIRED (approval unavailable until answered);
+     * otherwise all five complete with LOW or NONE -> APPROVAL_ELIGIBLE (eligibility only).
+     * It never records a decision.
+     */
     @Transactional(readOnly = true)
     public DecisionView consolidate(Long id) {
         ComplianceReview review = require(id);
-        List<ComplianceFinding> rows = findings.findByReviewIdOrderByIdAsc(id);
-        List<ComplianceFinding> reviewed = rows.stream()
+        List<ComplianceFinding> reviewed = findings.findByReviewIdOrderByIdAsc(id).stream()
                 .filter(f -> catalog.hasFunction(review.getPositionKey(), f.getFunctionKey())).toList();
         RiskLevel highest = reviewed.stream().map(ComplianceFinding::getRiskLevel).max(Comparator.naturalOrder()).orElse(RiskLevel.NONE);
+        boolean anyHigh = highest == RiskLevel.HIGH;
+
+        DecisionState state;
+        if (anyHigh) {
+            state = DecisionState.BLOCK;
+        } else if (reviewed.size() < SPECIALIST_COUNT) {
+            state = DecisionState.INCOMPLETE;
+        } else if (highest == RiskLevel.MEDIUM) {
+            state = DecisionState.CLARIFICATION_REQUIRED;
+        } else {
+            state = DecisionState.APPROVAL_ELIGIBLE;
+        }
 
         List<RiskItem> prioritized = reviewed.stream()
                 .sorted(Comparator.comparing(ComplianceFinding::getRiskLevel).reversed())
@@ -217,7 +258,6 @@ public class LegalComplianceService {
                 .toList();
 
         List<String> conflicts = new ArrayList<>();
-        boolean anyHigh = highest == RiskLevel.HIGH;
         boolean anyLow = reviewed.stream().anyMatch(f -> f.getRiskLevel().compareTo(RiskLevel.LOW) <= 0);
         if (anyHigh && anyLow) {
             for (ComplianceFinding high : reviewed.stream().filter(f -> f.getRiskLevel() == RiskLevel.HIGH).toList()) {
@@ -229,34 +269,105 @@ public class LegalComplianceService {
             }
         }
 
-        String recommendation;
-        if (reviewed.isEmpty()) {
-            recommendation = "CLARIFY";
-        } else if (anyHigh) {
-            recommendation = "REJECT";
-        } else if (reviewed.size() < SPECIALIST_COUNT || highest == RiskLevel.MEDIUM) {
-            recommendation = "CLARIFY";
-        } else {
-            recommendation = "APPROVE";
-        }
-        String summary = executiveSummary(review, recommendation, reviewed.size(), highest, conflicts.size());
-        return new DecisionView(id, recommendation, reviewed.size(), SPECIALIST_COUNT, highest, anyHigh, conflicts,
-                prioritized, summary, DISCLAIMER);
+        String summary = executiveSummary(review, state, reviewed.size(), highest, conflicts.size());
+        return new DecisionView(id, state, state == DecisionState.APPROVAL_ELIGIBLE, reviewed.size(), SPECIALIST_COUNT,
+                highest, anyHigh, conflicts, prioritized, summary, DISCLAIMER);
     }
 
-    private String executiveSummary(ComplianceReview review, String recommendation, int reviewed, RiskLevel highest, int conflicts) {
-        String head = switch (recommendation) {
-            case "APPROVE" -> "Recommend approval: all " + SPECIALIST_COUNT + " specialist reviews are complete and show only low risk.";
-            case "REJECT" -> "Recommend rejecting as written, or asking for changes to the high-risk clauses before accepting.";
-            default -> reviewed == 0
-                    ? "Recommend requesting clarification: no specialist findings are recorded yet."
-                    : "Recommend requesting clarification: " + (reviewed < SPECIALIST_COUNT
-                    ? (SPECIALIST_COUNT - reviewed) + " specialist review(s) are still missing."
-                    : "the highest risk is MEDIUM and needs an answer from the other party.");
+    private String executiveSummary(ComplianceReview review, DecisionState state, int reviewed, RiskLevel highest, int conflicts) {
+        String head = switch (state) {
+            case BLOCK -> "Blocked: a HIGH-risk finding needs human review before anything else. This does not decide the outcome.";
+            case INCOMPLETE -> reviewed == 0
+                    ? "Incomplete: no specialist findings are recorded yet. Approval is unavailable."
+                    : "Incomplete: " + reviewed + " of " + SPECIALIST_COUNT + " specialist reviews are recorded. Approval is unavailable until all five are complete.";
+            case CLARIFICATION_REQUIRED -> "Clarification required: the highest risk is MEDIUM. Resolve the open issues listed below. Approval is unavailable until they are answered.";
+            case APPROVAL_ELIGIBLE -> "Approval eligible: all five reviews are complete and show only LOW or NONE risk. This is eligibility only, not an approval; an authorized person must still decide.";
         };
         return review.getTitle() + ". " + head + " Highest risk: " + highest + "."
-                + (conflicts > 0 ? " " + conflicts + " conflicting opinion(s) to resolve." : "")
-                + (highest == RiskLevel.HIGH ? " Professional legal review is required before any decision." : "");
+                + (conflicts > 0 ? " " + conflicts + " conflicting opinion(s) to resolve." : "");
+    }
+
+    /* ---------- Owner-only actions ---------- */
+
+    /** Only the owner (an administrator who is a person, not an AI seat) may record a final decision or close an issue. */
+    private static void requireOwner(AppUser actor) {
+        if (actor.isAi() || actor.getRole() != UserRole.ADMIN) {
+            throw new ForbiddenException("Only the owner can record a final decision on a legal review.");
+        }
+    }
+
+    /**
+     * Records a human decision. Append-only. Approval is refused unless the Decision Assistant
+     * reports APPROVAL_ELIGIBLE at this moment. The reasoning is required.
+     */
+    @Transactional
+    public HumanDecisionView recordHumanDecision(AppUser actor, Long reviewId, HumanDecisionRequest q) {
+        requireOwner(actor);
+        ComplianceReview review = require(reviewId);
+        HumanOutcome outcome = outcome(q.outcome());
+        String reasoning = q.reasoning() == null ? "" : q.reasoning().trim();
+        if (reasoning.length() < MIN_REASONING) {
+            throw new ConflictException("Write your reasoning (at least " + MIN_REASONING + " characters) so the decision can be reviewed later.");
+        }
+        if (reasoning.length() > MAX_TEXT) reasoning = reasoning.substring(0, MAX_TEXT);
+        DecisionState state = consolidate(reviewId).state();
+        if (outcome == HumanOutcome.APPROVE && state != DecisionState.APPROVAL_ELIGIBLE) {
+            throw new ConflictException("Approval is unavailable while the review is " + state
+                    + ". Resolve the findings first, or record a different decision.");
+        }
+        LocalDateTime now = now();
+        HumanDecision decision = decisions.save(new HumanDecision(reviewId, outcome, reasoning, actor.getId(),
+                actor.getDisplayName(), state, now));
+        ReviewStatus next = switch (outcome) {
+            case APPROVE -> ReviewStatus.APPROVED;
+            case REJECT -> ReviewStatus.REJECTED;
+            case REQUEST_CHANGES -> ReviewStatus.NEEDS_CLARIFICATION;
+            case DEFER -> review.getStatus();
+        };
+        if (next != review.getStatus()) review.changeStatus(next, now); else review.touch(now);
+        activity.record("LEGAL_DECISION", actor.getDisplayName() + " recorded " + outcome + " on \"" + review.getTitle()
+                + "\" (assistant: " + state + ")");
+        return humanView(decision);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HumanDecisionView> humanDecisions(AppUser actor, Long reviewId) {
+        requireOwner(actor);
+        require(reviewId);
+        return decisions.findByReviewIdOrderByIdAsc(reviewId).stream().map(this::humanView).toList();
+    }
+
+    /** Marks whether the issue behind a review is resolved. Owner only. */
+    @Transactional
+    public ReviewView trackIssue(AppUser actor, Long reviewId, IssueRequest q) {
+        requireOwner(actor);
+        ComplianceReview review = require(reviewId);
+        String note = clip(q.note(), MAX_TEXT);
+        review.trackIssue(q.resolved(), actor.getDisplayName(), note, now());
+        activity.record("LEGAL_ISSUE", actor.getDisplayName() + (q.resolved() ? " marked resolved: " : " reopened: ") + "\"" + review.getTitle() + "\"");
+        return view(review, findings.findByReviewIdOrderByIdAsc(reviewId), LocalDate.now(clock));
+    }
+
+    /** Everything needed to decide one review, for Owner's Office. Read-only. */
+    @Transactional(readOnly = true)
+    public ReviewPackage reviewPackage(Long reviewId) {
+        ComplianceReview review = require(reviewId);
+        return new ReviewPackage(view(review, findings.findByReviewIdOrderByIdAsc(reviewId), LocalDate.now(clock)),
+                consolidate(reviewId),
+                decisions.findByReviewIdOrderByIdAsc(reviewId).stream().map(this::humanView).toList());
+    }
+
+    private HumanDecisionView humanView(HumanDecision d) {
+        return new HumanDecisionView(d.getId(), d.getReviewId(), d.getOutcome().name(), d.getReasoning(),
+                d.getDecidedByName(), d.getAssistantState(), d.getDecidedAt());
+    }
+
+    private static HumanOutcome outcome(String value) {
+        try {
+            return HumanOutcome.valueOf(value);
+        } catch (RuntimeException e) {
+            throw new ConflictException("Choose APPROVE, REJECT, REQUEST_CHANGES or DEFER.");
+        }
     }
 
     /* ---------- helpers ---------- */
@@ -269,7 +380,8 @@ public class LegalComplianceService {
         boolean overdue = r.getDeadline() != null && r.getDeadline().isBefore(today) && ReviewStatus.PENDING.contains(r.getStatus());
         return new ReviewView(r.getId(), r.getCategory().name(), r.getCategory().label(), r.getTitle(), r.getDocumentRef(),
                 r.getDescription(), r.getPriority(), r.getDeadline(), r.getStatus().name(), overdue, r.getFindingsSummary(),
-                r.getRecommendedAction(), out, r.getCreatedAt(), r.getUpdatedAt(), r.getCompletedAt());
+                r.getRecommendedAction(), out, r.getCreatedAt(), r.getUpdatedAt(), r.getCompletedAt(),
+                r.isIssueResolved(), r.getIssueResolvedAt(), r.getIssueResolvedByName(), r.getIssueNote());
     }
 
     private Map<Long, List<ComplianceFinding>> findingsByReview(List<ComplianceReview> list) {

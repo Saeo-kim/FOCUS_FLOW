@@ -5,6 +5,9 @@ import com.example.project_flow.admin.web.UserSession;
 import com.example.project_flow.legal.LegalCatalog;
 import com.example.project_flow.legal.LegalComplianceService;
 import com.example.project_flow.legal.LegalComplianceService.DecisionView;
+import com.example.project_flow.legal.LegalComplianceService.HumanDecisionRequest;
+import com.example.project_flow.legal.LegalComplianceService.HumanDecisionView;
+import com.example.project_flow.legal.LegalComplianceService.IssueRequest;
 import com.example.project_flow.legal.LegalComplianceService.FindingRequest;
 import com.example.project_flow.legal.LegalComplianceService.PositionView;
 import com.example.project_flow.legal.LegalComplianceService.ReviewRequest;
@@ -88,5 +91,24 @@ public class LegalComplianceController {
     @GetMapping("/reviews/{id}/decision")
     public DecisionView decision(@PathVariable Long id) {
         return service.consolidate(id);
+    }
+
+    /** Human decisions on a review, oldest first. Owner only. */
+    @GetMapping("/reviews/{id}/human-decisions")
+    public List<HumanDecisionView> humanDecisions(@PathVariable Long id, HttpServletRequest request) {
+        return service.humanDecisions(UserSession.user(request), id);
+    }
+
+    /** Records the owner's final decision. Append-only; approval only when the assistant reports APPROVAL_ELIGIBLE. */
+    @PostMapping("/reviews/{id}/human-decisions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public HumanDecisionView recordDecision(@PathVariable Long id, @RequestBody HumanDecisionRequest body, HttpServletRequest request) {
+        return service.recordHumanDecision(UserSession.user(request), id, body);
+    }
+
+    /** Marks the review's issue resolved or open. Owner only. */
+    @PutMapping("/reviews/{id}/issue")
+    public ReviewView issue(@PathVariable Long id, @RequestBody IssueRequest body, HttpServletRequest request) {
+        return service.trackIssue(UserSession.user(request), id, body);
     }
 }
