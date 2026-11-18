@@ -432,4 +432,52 @@ class SecurityGovernanceTest {
         assertThrows(ConflictException.class, () -> security.grant(owner, admin().getId(), SecurityLevel.RESTRICTED, "short", null),
                 "RESTRICTED needs a real justification");
     }
+
+    /* ---------- safe defaults ---------- */
+
+    @Test
+    void aPersonAtRestrictedNeedsAGrantAndAPerUseApproval() {
+        AppUser owner = owner();
+        AppUser person = admin();
+        AppUser requester = admin();
+        ItemView vault = item(owner, "deploy key vault", DataCategory.CREDENTIAL, SecurityLevel.RESTRICTED, null);
+        assertEquals("BLOCKED", security.evaluate(requester, person.getId(), vault.id(), Destination.INTERNAL_AI_TOOL, "x", null).decision(),
+                "no grant: blocked");
+        security.grant(owner, person.getId(), SecurityLevel.RESTRICTED, "Rotating the deploy key this sprint for the infra team.", null);
+        AccessResult waiting = security.evaluate(requester, person.getId(), vault.id(), Destination.INTERNAL_AI_TOOL, "rotate", null);
+        assertEquals("PENDING_APPROVAL", waiting.decision(), "a grant alone is not enough at RESTRICTED");
+        security.decideRequest(owner, waiting.requestId(), true, "Approved for one rotation of the deploy key.");
+        assertEquals("ALLOWED", security.evaluate(requester, person.getId(), vault.id(), Destination.INTERNAL_AI_TOOL, "rotate", null).decision());
+        assertEquals("PENDING_APPROVAL", security.evaluate(requester, person.getId(), vault.id(), Destination.INTERNAL_AI_TOOL, "again", null).decision(),
+                "the approval is spent after one use");
+    }
+
+    @Test
+    void anAiSeatCanNeverReceiveRestrictedInformation() {
+        AppUser owner = owner();
+        AppUser seat = aiSeat();
+        ItemView vault = item(owner, "prod secret", DataCategory.CREDENTIAL, SecurityLevel.RESTRICTED, null);
+        assertThrows(ConflictException.class, () -> security.grant(owner, seat.getId(), SecurityLevel.RESTRICTED, JUSTIFICATION, null));
+        assertEquals("BLOCKED", security.evaluate(owner, seat.getId(), vault.id(), Destination.INTERNAL_AI_TOOL, "x", null).decision());
+    }
+
+    @Test
+    void anApprovedPolicyDoesNotChangeEnforcement() {
+        AppUser owner = owner();
+        ItemView conf = item(owner, "policy probe " + UUID.randomUUID(), DataCategory.BUSINESS_PLAN, SecurityLevel.CONFIDENTIAL, "plan");
+        AppUser author = admin();
+        security.assignPosition(owner, SecurityPositionCatalog.CISO, author.getId());
+        PolicyView p = security.draftPolicy(author, "probe-" + UUID.randomUUID(), "Allow external AI",
+                "Confidential information may be sent to external AI providers.");
+        security.approvePolicy(owner, p.id());
+        assertEquals("BLOCKED", security.evaluate(owner, owner.getId(), conf.id(), Destination.EXTERNAL_AI_PROVIDER, "x", null).decision(),
+                "policy text cannot relax the rules");
+    }
+
+    @Test
+    void theSafeDefaultsAreRecordedAsAnApprovedPolicy() {
+        AppUser owner = owner();
+        assertTrue(security.policies(owner).stream().anyMatch(p -> p.policyKey().equals(SecurityDefaults.POLICY_KEY)
+                && p.status().equals("APPROVED") && p.body().contains("RESTRICTED information is never sent")));
+    }
 }

@@ -258,38 +258,36 @@ public class SecurityService {
                     "\"" + item.getTitle() + "\" to external AI, log #" + blocked.logSeq(), requester.getDisplayName());
             return blocked;
         }
-        // Authorization
+        // Authorization. Defaults (see SecurityDefaults): AI seats need a grant above PUBLIC and a per-use
+        // Owner approval above INTERNAL; people need a grant above INTERNAL and a per-use approval for RESTRICTED.
         if (level != SecurityLevel.PUBLIC) {
             Optional<AiAccessGrant> grant = activeGrant(actor);
             boolean levelGranted = grant.map(g -> g.getMaxLevel().compareTo(level) >= 0).orElse(false);
-            if (actor.isAi()) {
-                if (!levelGranted) {
-                    AccessResult blocked = finish(requester, actor, item, destination, Decision.BLOCKED,
-                            "This AI seat has no grant for " + level + " information.", foundSummary, null, null);
-                    incident("AI seat without grant requested " + level + " information", SecurityIncident.Severity.MEDIUM,
-                            "\"" + item.getTitle() + "\", seat " + actor.getDisplayName() + ", log #" + blocked.logSeq(), requester.getDisplayName());
-                    return blocked;
-                }
-                if (level.compareTo(SecurityLevel.INTERNAL) > 0) {
-                    Optional<AccessRequest> approved = requests.findFirstByActorUserIdAndItemIdAndStatusOrderByIdAsc(
-                            actor.getId(), item.getId(), AccessRequest.Status.APPROVED);
-                    if (approved.isEmpty()) {
-                        AccessRequest pending = requests.findFirstByActorUserIdAndItemIdAndStatusOrderByIdAsc(
-                                actor.getId(), item.getId(), AccessRequest.Status.PENDING).orElseGet(() -> requests.save(new AccessRequest(
-                                actor.getId(), actor.getDisplayName(), item.getId(), item.getTitle(), level, destination,
-                                purpose == null ? "" : purpose, requester.getId(), requester.getDisplayName(), now())));
-                        AccessResult waiting = finish(requester, actor, item, destination, Decision.PENDING_APPROVAL,
-                                "Waiting for the Owner's approval (request #" + pending.getId() + ").", foundSummary, pending.getId(), null);
-                        return waiting;
-                    }
-                    approved.get().consume(now());
-                }
-            } else if (level.compareTo(SecurityLevel.INTERNAL) > 0 && !levelGranted) {
-                AccessResult blocked = finish(requester, actor, item, destination, Decision.BLOCKED,
-                        "No grant covers " + level + " information for this person.", foundSummary, null, null);
-                incident("Unauthorized access attempt to " + level + " information", SecurityIncident.Severity.MEDIUM,
-                        "\"" + item.getTitle() + "\", person " + actor.getDisplayName() + ", log #" + blocked.logSeq(), requester.getDisplayName());
+            boolean needsGrant = actor.isAi() || level.compareTo(SecurityLevel.INTERNAL) > 0;
+            if (needsGrant && !levelGranted) {
+                String reason = actor.isAi()
+                        ? "This AI seat has no grant for " + level + " information."
+                        : "No grant covers " + level + " information for this person.";
+                AccessResult blocked = finish(requester, actor, item, destination, Decision.BLOCKED, reason, foundSummary, null, null);
+                incident((actor.isAi() ? "AI seat" : "Unauthorized person") + " without grant requested " + level + " information",
+                        SecurityIncident.Severity.MEDIUM,
+                        "\"" + item.getTitle() + "\", actor " + actor.getDisplayName() + ", log #" + blocked.logSeq(), requester.getDisplayName());
                 return blocked;
+            }
+            boolean needsApproval = actor.isAi() ? level.compareTo(SecurityLevel.INTERNAL) > 0 : level == SecurityLevel.RESTRICTED;
+            if (needsApproval) {
+                Optional<AccessRequest> approved = requests.findFirstByActorUserIdAndItemIdAndStatusOrderByIdAsc(
+                        actor.getId(), item.getId(), AccessRequest.Status.APPROVED);
+                if (approved.isEmpty()) {
+                    AccessRequest pending = requests.findFirstByActorUserIdAndItemIdAndStatusOrderByIdAsc(
+                            actor.getId(), item.getId(), AccessRequest.Status.PENDING).orElseGet(() -> requests.save(new AccessRequest(
+                            actor.getId(), actor.getDisplayName(), item.getId(), item.getTitle(), level, destination,
+                            purpose == null ? "" : purpose, requester.getId(), requester.getDisplayName(), now())));
+                    return finish(requester, actor, item, destination, Decision.PENDING_APPROVAL,
+                            "Waiting for the Owner's approval (request #" + pending.getId() + "). One approval covers one use.",
+                            foundSummary, pending.getId(), null);
+                }
+                approved.get().consume(now());
             }
         }
         // Release, with personal data redacted

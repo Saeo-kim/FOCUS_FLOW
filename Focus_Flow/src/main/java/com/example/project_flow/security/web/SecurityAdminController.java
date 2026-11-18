@@ -8,6 +8,7 @@ import com.example.project_flow.security.Destination;
 import com.example.project_flow.security.Decision;
 import com.example.project_flow.security.SecurityIncident;
 import com.example.project_flow.security.SecurityLevel;
+import com.example.project_flow.security.SecurityDefaults;
 import com.example.project_flow.security.SecurityService;
 import com.example.project_flow.security.SecurityService.AccessResult;
 import com.example.project_flow.security.SecurityService.FindingView;
@@ -76,6 +77,13 @@ public class SecurityAdminController {
 
     private static AppUser me(HttpServletRequest r) {
         return UserSession.user(r);
+    }
+
+    /** The safe defaults in force, as recorded in the system. Read-only. */
+    @GetMapping("/defaults")
+    public java.util.Map<String, Object> defaults(HttpServletRequest r) {
+        me(r);
+        return java.util.Map.of("policyKey", SecurityDefaults.POLICY_KEY, "rules", SecurityDefaults.RULES);
     }
 
     @GetMapping("/summary")

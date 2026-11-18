@@ -42,7 +42,7 @@ public class SecurityPolicy {
     @Column(nullable = false, length = 12)
     private Status status = Status.DRAFT;
 
-    @Column(nullable = false)
+    /** Null for system-recorded defaults, which have no human author. Human-authored policies always set it. */
     private Long authoredByUserId;
 
     @Column(nullable = false, length = 60)
