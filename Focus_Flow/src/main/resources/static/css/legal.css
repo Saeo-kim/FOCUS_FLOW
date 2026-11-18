@@ -17,3 +17,8 @@
 .legal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 640px) { .legal-stats { grid-template-columns: 1fr; } }
 .legal-owner { display: grid; gap: 10px; }
+/* Phone widths: let review table cells wrap instead of cutting text off. */
+@media (max-width: 640px) {
+    .legal-table { min-width: 560px; }
+    .legal-table th, .legal-table td { white-space: normal; vertical-align: top; }
+}
