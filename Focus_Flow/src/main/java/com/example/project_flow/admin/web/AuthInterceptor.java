@@ -3,6 +3,8 @@ package com.example.project_flow.admin.web;
 import com.example.project_flow.admin.account.AccountService;
 import com.example.project_flow.admin.account.AppUser;
 import com.example.project_flow.admin.account.UserRole;
+import com.example.project_flow.legal.web.LegalIntegrationController;
+import org.springframework.web.method.HandlerMethod;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -51,8 +53,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (PUBLIC_PATHS.contains(path)) {
             return true;
         }
-        // Integration endpoints authenticate with their own service token (see LegalIntegrationController).
-        if (path.startsWith("/api/integration/")) {
+        // Only the Legal integration handlers skip the session check. They authenticate with their own
+        // service token, and nothing else is exempted: matching is on the resolved handler, not the URL text.
+        if (handler instanceof HandlerMethod handlerMethod && handlerMethod.getBeanType() == LegalIntegrationController.class) {
             return true;
         }
         AppUser user = accounts.activeUser(UserSession.userId(request)).orElse(null);

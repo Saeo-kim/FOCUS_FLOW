@@ -24,7 +24,7 @@ window.Legal = (() => {
     const OUTCOME = {
         APPROVE: "Approve", REJECT: "Reject", REQUEST_CHANGES: "Request changes", DEFER: "Defer (no decision yet)",
     };
-    const state = { meta: null, position: null, selected: null, decisionFor: null, decision: null, history: [], busy: false };
+    const state = { meta: null, position: null, selected: null, decisionFor: null, decision: null, history: [], busy: false, owner: null, me: null };
 
     const date = (s) => (s ? new Date(s + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
     const when = (s) => (s ? new Date(s).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
@@ -45,6 +45,40 @@ window.Legal = (() => {
                 h("span", { class: "legal-num" }, String(i + 1).padStart(2, "0")),
                 h("div", null, h("strong", null, f.title), h("div", { class: "muted small" }, f.description))))),
             h("p", { class: "muted small" }, "No one is assigned yet. The owner assigns this position; FOCUS FLOW does not fill it automatically."));
+    }
+
+    /** Who holds final decision authority. Administrators can see this; only the Owner can decide. */
+    function ownerCard() {
+        const o = state.owner;
+        const me = state.me;
+        const isMeAdmin = me && me.role === "ADMIN" && me.kind !== "AI";
+        const head = o && o.userId
+            ? h("p", { class: "ai-summary" }, h("strong", null, o.userName), " is the Owner", o.appointedAt ? ` since ${when(o.appointedAt)}` : "", ".")
+            : h("p", { class: "ai-summary" }, "The Owner is not appointed. No final decision can be recorded until someone is appointed.");
+        const controls = [];
+        if (o && o.youAreOwner) {
+            controls.push(h("p", { class: "muted small" }, "You are the Owner. You alone record final decisions here."));
+            controls.push(h("button", { class: "btn", type: "button", onclick: async () => {
+                if (!window.confirm("Step down as Owner? The position becomes unassigned and no one can record decisions until someone is appointed.")) return;
+                try { await call("/api/admin/legal/owner/revoke", { method: "POST" }); toast("You stepped down as Owner."); refresh(); }
+                catch (error) { toast(error.message, true); }
+            } }, "Step down as Owner"));
+        } else if (!o || !o.userId) {
+            if (isMeAdmin) {
+                controls.push(h("p", { class: "muted small" }, "Appointing the Owner is an explicit act recorded with your name. Administrator access alone does not make anyone the Owner."));
+                controls.push(h("button", { class: "btn primary", type: "button", onclick: async () => {
+                    if (!window.confirm("Appoint yourself as the Owner of legal decisions? This is recorded with your name.")) return;
+                    try { await call("/api/admin/legal/owner", { method: "PUT", body: { userId: me.id } }); toast("You are now the Owner."); refresh(); }
+                    catch (error) { toast(error.message, true); }
+                } }, icon("check", 16), "Appoint myself as Owner"));
+            }
+        } else {
+            controls.push(h("p", { class: "muted small" }, "Only the current Owner can appoint a successor or step down."));
+        }
+        return h("section", { class: "card legal-owner" },
+            h("div", { class: "section-heading" }, h("h2", null, "Owner of legal decisions"),
+                h("span", { class: "muted small" }, "Final decisions belong to the Owner alone")),
+            head, ...controls);
     }
 
     function newReviewCard() {
@@ -161,6 +195,14 @@ window.Legal = (() => {
     function issuePanel(review) {
         const resolved = h("input", { type: "checkbox", id: "legal-issue-resolved", checked: review.issueResolved ? true : null });
         const note = h("textarea", { rows: 2, maxlength: 4000, "aria-label": "Issue note", placeholder: "What was done, or what is still open" }, review.issueNote || "");
+        const isOwner = state.owner && state.owner.youAreOwner;
+        if (!isOwner) {
+            return h("section", { class: "legal-issue" },
+                h("h3", { class: "ai-subhead" }, "Issue status"),
+                h("p", { class: "muted small" }, review.issueResolved
+                    ? `Resolved${review.issueResolvedByName ? " by " + review.issueResolvedByName : ""}.`
+                    : "Open. Only the Owner can mark the issue resolved."));
+        }
         const save = h("button", { class: "btn", type: "button", onclick: async () => {
             try {
                 await call(`/api/admin/legal/reviews/${review.id}/issue`, { method: "PUT", body: { resolved: resolved.checked, note: note.value.trim() || null } });
@@ -219,7 +261,12 @@ window.Legal = (() => {
             h("label", { class: "field" }, "Review status", status),
             h("div", { class: "row" }, saveDraft),
             issuePanel(review),
-            state.decision && state.decisionFor === review.id ? humanPanel(review, state.decision) : null);
+            state.decision && state.decisionFor === review.id
+                ? (state.owner && state.owner.youAreOwner
+                    ? humanPanel(review, state.decision)
+                    : h("section", { class: "legal-human" }, h("h3", { class: "ai-subhead" }, "Final decision"),
+                        h("p", { class: "muted small" }, "Only the appointed Owner can record a final decision. You can review the assistant's findings above.")))
+                : null);
     }
 
     async function loadSelected(review) {
@@ -227,11 +274,15 @@ window.Legal = (() => {
         if (state.decisionFor === review.id) return;
         state.decisionFor = review.id;
         state.decision = await call(`/api/admin/legal/reviews/${review.id}/decision`);
-        state.history = await call(`/api/admin/legal/reviews/${review.id}/human-decisions`);
+        state.history = state.owner && state.owner.youAreOwner
+            ? await call(`/api/admin/legal/reviews/${review.id}/human-decisions`)
+            : [];
     }
 
     async function view(params = new URLSearchParams()) {
         if (!state.meta) state.meta = await call("/api/admin/legal/meta");
+        state.me = await FF.ready();
+        state.owner = await call("/api/admin/legal/owner");
         const [positions, reviews] = await Promise.all([call("/api/admin/legal/positions"), call("/api/admin/legal/reviews")]);
         state.position = positions.find(p => p.key === "legal-compliance-lead") || positions[0] || null;
         if (params.get("review")) state.selected = Number(params.get("review"));
@@ -241,6 +292,7 @@ window.Legal = (() => {
         const p = state.position;
         return h("div", { class: "stack" },
             p ? positionCard(p) : h("div", { class: "card empty" }, "The Legal & Compliance position is not registered yet."),
+            ownerCard(),
             p && h("section", { class: "stats legal-stats" },
                 stat(p.pendingReviews, "Pending reviews"),
                 stat(p.highPriorityRisks, "High-priority risks"),

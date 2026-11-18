@@ -18,10 +18,13 @@ import java.security.MessageDigest;
 import java.util.List;
 
 /**
- * Read-only access for Owner's Office. It sees reviews, the five specialist findings, the Decision
- * Assistant's readiness and the human decisions recorded so far. It cannot record a decision: only
- * the owner, signed in to FOCUS FLOW, can. Authenticated by a service token (FOCUS_FLOW_LEGAL_TOKEN),
- * which is disabled when unset.
+ * Read-only access for Owner's Office. It sees reviews, findings, the assistant's readiness state and
+ * recorded decisions. It cannot record a decision: that needs independent authentication, which is not
+ * designed yet. Every handler here requires the service token (FOCUS_FLOW_LEGAL_TOKEN). If the token is
+ * not configured, every request is refused with 401, so the integration is closed by default.
+ *
+ * AuthInterceptor exempts only this controller's handlers from the session check, and only because
+ * this class checks the token itself. Nothing else is exempted.
  */
 @RestController
 @RequestMapping("/api/integration/owners-office/legal")
@@ -51,12 +54,11 @@ public class LegalIntegrationController {
         return service.reviewPackage(id);
     }
 
+    /** Constant-time comparison. Any failure, including an unconfigured token, is a plain 401. */
     private void authorize(String header) {
-        if (expected == null) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The Legal integration is not enabled.");
-        }
         String given = header != null && header.startsWith("Bearer ") ? header.substring(7).trim() : "";
-        if (!MessageDigest.isEqual(given.getBytes(StandardCharsets.UTF_8), expected)) {
+        boolean valid = expected != null && MessageDigest.isEqual(given.getBytes(StandardCharsets.UTF_8), expected);
+        if (!valid) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required.");
         }
     }

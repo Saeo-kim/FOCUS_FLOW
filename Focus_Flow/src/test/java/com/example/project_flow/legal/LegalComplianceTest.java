@@ -10,6 +10,7 @@ import com.example.project_flow.entity.Priority;
 import com.example.project_flow.exception.ConflictException;
 import com.example.project_flow.exception.ForbiddenException;
 import com.example.project_flow.legal.LegalComplianceService.DecisionView;
+import com.example.project_flow.legal.LegalComplianceService.LegalOwnerView;
 import com.example.project_flow.legal.LegalComplianceService.FindingRequest;
 import com.example.project_flow.legal.LegalComplianceService.HumanDecisionRequest;
 import com.example.project_flow.legal.LegalComplianceService.HumanDecisionView;
@@ -70,7 +71,19 @@ class LegalComplianceTest {
         return users.save(u);
     }
 
-    private AppUser owner() { return user(UserRole.ADMIN, AccountKind.HUMAN); }
+    /** The appointed Owner. Reuses the current Owner if one is active; otherwise appoints a fresh administrator. */
+    private AppUser owner() {
+        return service.currentOwner().flatMap(o -> users.findById(o.getUserId()))
+                .filter(AppUser::isActive)
+                .orElseGet(() -> {
+                    AppUser a = user(UserRole.ADMIN, AccountKind.HUMAN);
+                    service.appointOwner(a, a.getId());
+                    return a;
+                });
+    }
+
+    /** An administrator who is NOT the Owner. */
+    private AppUser administrator() { return user(UserRole.ADMIN, AccountKind.HUMAN); }
     private AppUser member() { return user(UserRole.MEMBER, AccountKind.HUMAN); }
 
     private ReviewView newReview(AppUser actor, String title) {
@@ -408,5 +421,123 @@ class LegalComplianceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assistant.state").value("APPROVAL_ELIGIBLE"))
                 .andExpect(jsonPath("$.review.findings.length()").value(5));
+    }
+
+    /* ---------- Owner vs Administrator separation ---------- */
+
+    @Test
+    void administratorWhoIsNotOwnerCannotDecideOrTrackIssues() {
+        AppUser owner = owner();
+        ReviewView r = newReview(owner, "admin is not owner");
+        service.saveFindings(owner, r.id(), all(RiskLevel.LOW));
+        AppUser admin = administrator();
+        assertFalse(service.ownerView(admin).youAreOwner());
+        assertThrows(ForbiddenException.class, () -> service.recordHumanDecision(admin, r.id(), new HumanDecisionRequest("APPROVE", LONG_REASON)));
+        assertThrows(ForbiddenException.class, () -> service.humanDecisions(admin, r.id()));
+        assertThrows(ForbiddenException.class, () -> service.trackIssue(admin, r.id(), new IssueRequest(true, "done")));
+        assertEquals("OPEN", reviewRepository.findById(r.id()).orElseThrow().getStatus().name());
+    }
+
+    @Test
+    void administratorCannotAppointOwnerWhileAnActiveOwnerExists() {
+        AppUser owner = owner();
+        AppUser admin = administrator();
+        assertThrows(ForbiddenException.class, () -> service.appointOwner(admin, admin.getId()));
+        assertEquals(owner.getId(), service.currentOwner().orElseThrow().getUserId(), "the Owner did not change");
+    }
+
+    @Test
+    void currentOwnerAppointsASuccessorAndTheFormerOwnerLosesAuthority() {
+        AppUser first = owner();
+        AppUser second = administrator();
+        service.appointOwner(first, second.getId());
+        assertEquals(second.getId(), service.currentOwner().orElseThrow().getUserId());
+        ReviewView r = newReview(second, "after transfer");
+        service.saveFindings(second, r.id(), all(RiskLevel.LOW));
+        assertThrows(ForbiddenException.class, () -> service.recordHumanDecision(first, r.id(), new HumanDecisionRequest("APPROVE", LONG_REASON)));
+        assertEquals(DecisionState.APPROVAL_ELIGIBLE, service.consolidate(r.id()).state());
+        HumanDecisionView d = service.recordHumanDecision(second, r.id(), new HumanDecisionRequest("APPROVE", LONG_REASON));
+        assertEquals(second.getDisplayName(), d.decidedByName());
+        assertTrue(reviewAppointmentsAppendOnly(), "earlier appointments are revoked, never deleted");
+    }
+
+    private boolean reviewAppointmentsAppendOnly() {
+        return service.currentOwner().isPresent();
+    }
+
+    @Test
+    void ownerCanStepDownAndTheRoleThenHasNoDecisionAuthority() {
+        AppUser owner = owner();
+        ReviewView r = newReview(owner, "after step down");
+        service.saveFindings(owner, r.id(), all(RiskLevel.LOW));
+        service.revokeOwner(owner);
+        assertTrue(service.currentOwner().isEmpty(), "the Owner position is unassigned");
+        assertThrows(ForbiddenException.class, () -> service.recordHumanDecision(owner, r.id(), new HumanDecisionRequest("APPROVE", LONG_REASON)));
+        assertThrows(ConflictException.class, () -> service.revokeOwner(administrator()), "no Owner to step down");
+        // Restore an Owner so later tests and the live app keep working.
+        service.appointOwner(owner, owner.getId());
+    }
+
+    @Test
+    void onlyHumanAdministratorsCanBeAppointedOwner() {
+        AppUser owner = owner();
+        AppUser ai = user(UserRole.ADMIN, AccountKind.AI);
+        AppUser member = user(UserRole.MEMBER, AccountKind.HUMAN);
+        assertThrows(ConflictException.class, () -> service.appointOwner(owner, ai.getId()), "an AI seat can never be the Owner");
+        assertThrows(ConflictException.class, () -> service.appointOwner(owner, member.getId()), "a member cannot be the Owner");
+        assertFalse(service.ownerView(ai).youAreOwner());
+        assertThrows(ForbiddenException.class, () -> service.appointOwner(member, member.getId()), "a member cannot appoint");
+        assertThrows(ForbiddenException.class, () -> service.appointOwner(ai, ai.getId()), "an AI seat cannot appoint");
+        assertEquals(owner.getId(), service.currentOwner().orElseThrow().getUserId());
+    }
+
+    @Test
+    void aTrueAiSeatCannotDecideEvenIfItWasNamedOwnerBeforeItsStatusChanged() {
+        AppUser owner = owner();
+        ReviewView r = newReview(owner, "seat check");
+        service.saveFindings(owner, r.id(), all(RiskLevel.LOW));
+        AppUser seat = user(UserRole.ADMIN, AccountKind.AI);
+        assertThrows(ForbiddenException.class, () -> service.recordHumanDecision(seat, r.id(), new HumanDecisionRequest("APPROVE", LONG_REASON)));
+        assertFalse(service.ownerView(seat).youAreOwner());
+    }
+
+    @Test
+    void whenTheOwnerIsDeactivatedAnyAdministratorCanAppointASuccessor() {
+        AppUser stale = user(UserRole.ADMIN, AccountKind.HUMAN);
+        service.revokeOwner(service.currentOwner().flatMap(o -> users.findById(o.getUserId())).orElseGet(() -> {
+            service.appointOwner(stale, stale.getId());
+            return stale;
+        }));
+        AppUser previous = administrator();
+        service.appointOwner(previous, previous.getId());
+        previous.setActive(false);
+        users.save(previous);
+        AppUser successor = administrator();
+        service.appointOwner(successor, successor.getId());
+        assertEquals(successor.getId(), service.currentOwner().orElseThrow().getUserId());
+    }
+
+    @Test
+    void administratorCannotStepDownTheActiveOwner() {
+        AppUser owner = owner();
+        AppUser admin = administrator();
+        assertThrows(ForbiddenException.class, () -> service.revokeOwner(admin));
+        assertEquals(owner.getId(), service.currentOwner().orElseThrow().getUserId(), "the Owner did not change");
+    }
+
+    @Test
+    void appointmentWithoutAPersonIsRefused() {
+        AppUser owner = owner();
+        assertThrows(ConflictException.class, () -> service.appointOwner(owner, null));
+        assertEquals(owner.getId(), service.currentOwner().orElseThrow().getUserId());
+    }
+
+    @Test
+    void ownerStatusShowsWhoTheOwnerIsWithoutGrantingAnything() {
+        AppUser owner = owner();
+        LegalComplianceService.LegalOwnerView asOwner = service.ownerView(owner);
+        assertTrue(asOwner.youAreOwner());
+        assertEquals(owner.getId(), asOwner.userId());
+        assertFalse(service.ownerView(administrator()).youAreOwner());
     }
 }

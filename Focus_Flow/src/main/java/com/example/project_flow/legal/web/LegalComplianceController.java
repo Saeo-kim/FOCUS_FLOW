@@ -5,6 +5,7 @@ import com.example.project_flow.admin.web.UserSession;
 import com.example.project_flow.legal.LegalCatalog;
 import com.example.project_flow.legal.LegalComplianceService;
 import com.example.project_flow.legal.LegalComplianceService.DecisionView;
+import com.example.project_flow.legal.LegalComplianceService.LegalOwnerView;
 import com.example.project_flow.legal.LegalComplianceService.HumanDecisionRequest;
 import com.example.project_flow.legal.LegalComplianceService.HumanDecisionView;
 import com.example.project_flow.legal.LegalComplianceService.IssueRequest;
@@ -104,6 +105,27 @@ public class LegalComplianceController {
     @ResponseStatus(HttpStatus.CREATED)
     public HumanDecisionView recordDecision(@PathVariable Long id, @RequestBody HumanDecisionRequest body, HttpServletRequest request) {
         return service.recordHumanDecision(UserSession.user(request), id, body);
+    }
+
+    /** Owner status: who the Owner is, and whether the caller is that person. Any administrator can read it. */
+    @GetMapping("/owner")
+    public LegalOwnerView owner(HttpServletRequest request) {
+        return service.ownerView(UserSession.user(request));
+    }
+
+    /** Appoints the Owner. Rules are enforced in the service (see LegalComplianceService.appointOwner). */
+    @PutMapping("/owner")
+    public LegalOwnerView appoint(@RequestBody AppointRequest body, HttpServletRequest request) {
+        return service.appointOwner(UserSession.user(request), body.userId());
+    }
+
+    /** The current Owner steps down; the position becomes unassigned. */
+    @PostMapping("/owner/revoke")
+    public LegalOwnerView stepDown(HttpServletRequest request) {
+        return service.revokeOwner(UserSession.user(request));
+    }
+
+    public record AppointRequest(Long userId) {
     }
 
     /** Marks the review's issue resolved or open. Owner only. */

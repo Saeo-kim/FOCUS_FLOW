@@ -1,6 +1,7 @@
 package com.example.project_flow.legal;
 
 import com.example.project_flow.admin.account.AppUser;
+import com.example.project_flow.admin.account.AppUserRepository;
 import com.example.project_flow.admin.account.UserRole;
 import com.example.project_flow.entity.Priority;
 import com.example.project_flow.exception.ConflictException;
@@ -75,6 +76,10 @@ public class LegalComplianceService {
     public record IssueRequest(boolean resolved, String note) {
     }
 
+    /** Owner status. {@code youAreOwner} is true only for the appointed Owner, asked by that person. */
+    public record LegalOwnerView(Long userId, String userName, LocalDateTime appointedAt, boolean youAreOwner) {
+    }
+
     /** Everything Owner's Office needs to show one review, for a human to decide. Read-only. */
     public record ReviewPackage(ReviewView review, DecisionView assistant, List<HumanDecisionView> humanDecisions) {
     }
@@ -92,18 +97,23 @@ public class LegalComplianceService {
     private final ComplianceReviewRepository reviews;
     private final ComplianceFindingRepository findings;
     private final HumanDecisionRepository decisions;
+    private final LegalOwnerAppointmentRepository ownerAppointments;
+    private final AppUserRepository users;
     private final ActivityLogService activity;
     private final Clock clock;
 
     public LegalComplianceService(LegalCatalog catalog, OrgPositionRepository positions, OrgPositionFunctionRepository functions,
                                   ComplianceReviewRepository reviews, ComplianceFindingRepository findings,
-                                  HumanDecisionRepository decisions, ActivityLogService activity, Clock clock) {
+                                  HumanDecisionRepository decisions, LegalOwnerAppointmentRepository ownerAppointments,
+                                  AppUserRepository users, ActivityLogService activity, Clock clock) {
         this.catalog = catalog;
         this.positions = positions;
         this.functions = functions;
         this.reviews = reviews;
         this.findings = findings;
         this.decisions = decisions;
+        this.ownerAppointments = ownerAppointments;
+        this.users = users;
         this.activity = activity;
         this.clock = clock;
     }
@@ -289,10 +299,88 @@ public class LegalComplianceService {
 
     /* ---------- Owner-only actions ---------- */
 
-    /** Only the owner (an administrator who is a person, not an AI seat) may record a final decision or close an issue. */
-    private static void requireOwner(AppUser actor) {
+    /* ---------- Owner (final decision authority) ---------- */
+
+    /** The active Owner appointment, if any. An administrator is not the Owner unless appointed. */
+    @Transactional(readOnly = true)
+    public Optional<LegalOwnerAppointment> currentOwner() {
+        return ownerAppointments.findByRevokedAtIsNullOrderByIdDesc().stream().findFirst();
+    }
+
+    /** Whether this person is the appointed Owner right now. AI seats are never the Owner. */
+    private boolean isOwner(AppUser actor) {
+        if (actor.isAi() || actor.getRole() != UserRole.ADMIN) return false;
+        return currentOwner().filter(o -> o.getUserId().equals(actor.getId()))
+                .flatMap(o -> users.findById(o.getUserId()))
+                .map(u -> u.isActive() && !u.isAi() && u.getRole() == UserRole.ADMIN)
+                .orElse(false);
+    }
+
+    /** Only the appointed Owner may record a final decision or track an issue. Administrators are refused. */
+    private void requireOwner(AppUser actor) {
+        if (!isOwner(actor)) {
+            throw new ForbiddenException("Only the appointed Owner can record a final decision on a legal review.");
+        }
+    }
+
+    /**
+     * Appoints the Owner. Rules: the target must be an active human administrator. If an active Owner
+     * exists, only that Owner can appoint a successor. If no active Owner exists (none appointed yet, or
+     * the previous Owner is inactive), any human administrator can appoint one. Each appointment is recorded.
+     */
+    @Transactional
+    public LegalOwnerView appointOwner(AppUser actor, Long userId) {
+        requireHumanAdministrator(actor);
+        if (userId == null) throw new ConflictException("Choose the person to appoint as Owner.");
+        AppUser target = users.findById(userId).orElseThrow(() -> new NotFoundException("That account no longer exists."));
+        if (target.isAi() || target.getRole() != UserRole.ADMIN || !target.isActive()) {
+            throw new ConflictException("The Owner must be an active person with administrator access.");
+        }
+        Optional<LegalOwnerAppointment> current = currentOwner();
+        boolean activeOwnerExists = current.isPresent() && isCurrentlyActiveOwner(current.get());
+        if (activeOwnerExists && !current.get().getUserId().equals(actor.getId())) {
+            throw new ForbiddenException("Only the current Owner can appoint a successor.");
+        }
+        LocalDateTime now = now();
+        current.ifPresent(o -> o.revoke(actor.getDisplayName(), now));
+        ownerAppointments.save(new LegalOwnerAppointment(target.getId(), target.getDisplayName(), actor.getId(), actor.getDisplayName(), now));
+        activity.record("LEGAL_OWNER", actor.getDisplayName() + " appointed " + target.getDisplayName() + " as Owner of legal decisions");
+        return ownerView();
+    }
+
+    /** The current Owner may step down. The Owner position is then unassigned again. */
+    @Transactional
+    public LegalOwnerView revokeOwner(AppUser actor) {
+        LegalOwnerAppointment current = currentOwner().orElseThrow(() -> new ConflictException("No Owner is appointed."));
+        if (!current.getUserId().equals(actor.getId())) {
+            throw new ForbiddenException("Only the current Owner can step down.");
+        }
+        current.revoke(actor.getDisplayName(), now());
+        activity.record("LEGAL_OWNER", actor.getDisplayName() + " stepped down as Owner; the position is unassigned");
+        return ownerView();
+    }
+
+    @Transactional(readOnly = true)
+    public LegalOwnerView ownerView() {
+        return ownerView(null);
+    }
+
+    @Transactional(readOnly = true)
+    public LegalOwnerView ownerView(AppUser viewer) {
+        Optional<LegalOwnerAppointment> current = currentOwner();
+        return new LegalOwnerView(current.map(LegalOwnerAppointment::getUserId).orElse(null),
+                current.map(LegalOwnerAppointment::getUserName).orElse(null),
+                current.map(LegalOwnerAppointment::getAppointedAt).orElse(null),
+                viewer != null && isOwner(viewer));
+    }
+
+    private boolean isCurrentlyActiveOwner(LegalOwnerAppointment o) {
+        return users.findById(o.getUserId()).map(u -> u.isActive() && !u.isAi() && u.getRole() == UserRole.ADMIN).orElse(false);
+    }
+
+    private static void requireHumanAdministrator(AppUser actor) {
         if (actor.isAi() || actor.getRole() != UserRole.ADMIN) {
-            throw new ForbiddenException("Only the owner can record a final decision on a legal review.");
+            throw new ForbiddenException("Only a person with administrator access can appoint the Owner.");
         }
     }
 
