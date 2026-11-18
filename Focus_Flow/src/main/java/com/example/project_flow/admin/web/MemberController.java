@@ -3,6 +3,9 @@ package com.example.project_flow.admin.web;
 import com.example.project_flow.admin.account.AppUser;
 import com.example.project_flow.admin.submission.SubmissionDtos.SubmissionDetail;
 import com.example.project_flow.admin.submission.SubmissionDtos.SubmissionResponse;
+import com.example.project_flow.admin.work.TaskCommentService;
+import com.example.project_flow.admin.work.TaskCommentService.CommentRequest;
+import com.example.project_flow.admin.work.TaskCommentService.CommentView;
 import com.example.project_flow.admin.submission.SubmissionService;
 import com.example.project_flow.admin.submission.SubmissionStatus;
 import com.example.project_flow.admin.work.WorkAccessService;
@@ -70,10 +73,12 @@ public class MemberController {
     private final DeadlineService deadlines;
     private final CalendarService calendar;
     private final SubmissionService submissions;
+    private final TaskCommentService comments;
 
     public MemberController(WorkAccessService access, TaskService tasks, WorkStepService steps, ProjectService projects,
                             PhaseService phases, DeadlineService deadlines, CalendarService calendar,
-                            SubmissionService submissions) {
+                            SubmissionService submissions, TaskCommentService comments) {
+        this.comments = comments;
         this.access = access;
         this.tasks = tasks;
         this.steps = steps;
@@ -158,6 +163,21 @@ public class MemberController {
     public TaskResponse setDone(@PathVariable Long id, @RequestBody TaskDoneRequest body, HttpServletRequest request) {
         access.requireTask(me(request).getId(), id);
         return tasks.setDone(id, body.done());
+    }
+
+    /** Discussion on one of the member's tasks. Mentioning @CFO asks the AI teammate to answer. */
+    @GetMapping("/tasks/{id}/comments")
+    public List<CommentView> comments(@PathVariable Long id, HttpServletRequest request) {
+        access.requireTask(me(request).getId(), id);
+        return comments.list(id);
+    }
+
+    @PostMapping("/tasks/{id}/comments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommentView postComment(@PathVariable Long id, @RequestBody CommentRequest body, HttpServletRequest request) {
+        AppUser user = me(request);
+        access.requireTask(user.getId(), id);
+        return comments.post(user, id, body == null ? null : body.body());
     }
 
     @PostMapping("/tasks/{id}/steps")

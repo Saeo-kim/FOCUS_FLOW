@@ -348,6 +348,7 @@ async function viewTaskDetails(params) {
                 },
             }, stepTitle, h("button", { class: "btn primary", type: "submit" }, icon("plus", 16), "Add Work Step"))),
 
+        renderDiscussion(task.id, { base: location.pathname.startsWith("/member") ? "member" : "admin" }),
         related && relatedRecordsCard(task, related));
 }
 

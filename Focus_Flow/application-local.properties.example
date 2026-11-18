@@ -6,3 +6,6 @@ DB_PASSWORD=
 # Most MySQL installations listen on 3306.
 DB_PORT=3306
 DB_NAME=focus_flow
+# AI teammate CFO (Owner's Office). Paste the same value that you set as OFFICE_AGENT_TOKEN there.
+# Leave it empty to keep Owner's Office disconnected. Never commit a real value.
+owners-office.token=

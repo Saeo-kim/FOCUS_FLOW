@@ -1,0 +1,6 @@
+build
+.gradle
+.git
+*.properties
+!application.properties
+src/test

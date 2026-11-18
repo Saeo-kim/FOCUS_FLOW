@@ -93,10 +93,11 @@ public class AccountService {
         String key = "login:" + login.toLowerCase(Locale.ROOT);
         guard(key);
         Optional<AppUser> found = login.contains("@") ? users.findByEmailIgnoreCase(login) : users.findByUsernameIgnoreCase(login);
-        AppUser user = found.filter(u -> u.isPasswordSet() && hasher.matches(request.password(), u.getPasswordHash())).orElse(null);
+        // AI seats never sign in, even if someone knew the username.
+        AppUser user = found.filter(u -> !u.isAi() && u.isPasswordSet() && hasher.matches(request.password(), u.getPasswordHash())).orElse(null);
         if (user == null) {
             fail(key);
-            if (found.isPresent() && !found.get().isPasswordSet()) {
+            if (found.isPresent() && !found.get().isAi() && !found.get().isPasswordSet()) {
                 throw new ConflictException("This account is waiting to be set up. Use your invitation code below.");
             }
             throw new ConflictException("The username or password is incorrect.");
@@ -121,7 +122,7 @@ public class AccountService {
         if (user.getInviteExpiresAt() != null && user.getInviteExpiresAt().isBefore(LocalDateTime.now(clock))) {
             throw new ConflictException("That code has expired. Ask your administrator for a new one.");
         }
-        if (!user.isActive()) {
+        if (!user.isActive() || user.isAi()) {
             throw new ConflictException("This account has been deactivated. Contact your administrator.");
         }
         boolean firstTime = !user.isPasswordSet() && user.getLastLoginAt() == null;
@@ -151,6 +152,9 @@ public class AccountService {
     /** Creates an account that the person activates with the returned one-time code. */
     @Transactional
     public IssuedCode invite(MemberCreateRequest request) {
+        if (request.kind() == AccountKind.AI) {
+            throw new ConflictException("AI teammates are added by FOCUS FLOW itself, not by invitation.");
+        }
         String username = request.username().trim();
         String email = cleanEmail(request.email());
         requireFreeUsername(username, null);
@@ -168,6 +172,9 @@ public class AccountService {
     @Transactional
     public IssuedCode resetAccess(Long actorId, Long userId) {
         AppUser user = require(userId);
+        if (user.isAi()) {
+            throw new ConflictException("AI teammates do not sign in, so they have no access code.");
+        }
         if (Objects.equals(actorId, userId)) {
             throw new ConflictException("Change your own password from Account settings instead.");
         }
@@ -190,7 +197,12 @@ public class AccountService {
         }
         user.rename(request.displayName().trim());
         user.changeEmail(email);
-        user.assignJob(request.kind() == null ? user.getKind() : request.kind(), References.clean(request.title()), request.department());
+        // An AI seat stays an AI seat; the kind of an existing account cannot be switched either way.
+        if (request.kind() == AccountKind.AI && !user.isAi()) {
+            throw new ConflictException("AI seats are set up by FOCUS FLOW itself. Create the seat instead of changing a person's account.");
+        }
+        AccountKind kind = user.isAi() ? AccountKind.AI : request.kind() == null ? user.getKind() : request.kind();
+        user.assignJob(kind, References.clean(request.title()), request.department());
         if (request.active() != null && request.active() != user.isActive()) {
             activity.record(request.active() ? "ACCOUNT_REACTIVATED" : "ACCOUNT_DEACTIVATED",
                     (request.active() ? "Reactivated " : "Deactivated ") + user.getDisplayName() + " (@" + user.getUsername() + ")");

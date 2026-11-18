@@ -382,6 +382,7 @@
                     ["Responsibility", task.responsibilityTitle],
                 ])),
 
+            renderDiscussion(task.id, { base: "member" }),
             h("div", { class: "card" },
                 sectionHead("Work Sequence", h("span", { class: "muted" }, `${task.completedStepCount} of ${task.stepCount} done`)),
                 steps.length ? h("div", { class: "task-list" }, steps.map((s, i) => stepRow(task, s, i, steps.length)))
