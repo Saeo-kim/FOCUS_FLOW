@@ -308,7 +308,7 @@ public class LegalComplianceService {
     }
 
     /** Whether this person is the appointed Owner right now. AI seats are never the Owner. */
-    private boolean isOwner(AppUser actor) {
+    public boolean isOwner(AppUser actor) {
         if (actor.isAi() || actor.getRole() != UserRole.ADMIN) return false;
         return currentOwner().filter(o -> o.getUserId().equals(actor.getId()))
                 .flatMap(o -> users.findById(o.getUserId()))

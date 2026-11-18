@@ -1,0 +1,13 @@
+/* AI governance & security page. Uses the tokens from app.css. */
+.sec-stats { margin: 12px 0 0; }
+.sec-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sec-form { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin-top: 8px; }
+.sec-form .wide { grid-column: 1 / -1; }
+.sec-result { margin-top: 12px; display: grid; gap: 8px; }
+.sec-pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-size: 13px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+@media (max-width: 640px) {
+    .sec-form { grid-template-columns: 1fr; }
+    .sec-page .ai-table { min-width: 620px; }
+    .sec-page .ai-table th, .sec-page .ai-table td { white-space: normal; vertical-align: top; }
+}

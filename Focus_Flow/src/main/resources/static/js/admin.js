@@ -805,6 +805,7 @@
         "admin-account": ["Account", "user", () => FF.viewAccount()],
         "ai-team": ["AI Team", "briefcase", params => window.AiTeam.view(params)],
         legal: ["Legal & Compliance", "check", params => window.Legal.view(params)],
+        security: ["AI Security", "activity", () => window.Security.view()],
     };
     Object.assign(ROUTES, ADMIN_ROUTES);
     // The original pages stay as they are; in a company workspace these two read better under clearer names.
@@ -812,7 +813,7 @@
     ROUTES.overview[0] = "Workspace Overview";
 
     FF.buildNav([
-        ["MANAGEMENT", [["admin", "Company Overview", "grid"], ["members", "Members", "users"], ["assignments", "Task Assignment", "target"], ["ai-team", "AI Team", "briefcase"], ["legal", "Legal & Compliance", "check"]]],
+        ["MANAGEMENT", [["admin", "Company Overview", "grid"], ["members", "Members", "users"], ["assignments", "Task Assignment", "target"], ["ai-team", "AI Team", "briefcase"], ["legal", "Legal & Compliance", "check"], ["security", "AI Security", "activity"]]],
         ["REVIEW", [["submissions", "Review Queue", "upload"], ["tracker", "Submission Tracker", "check"], ["files", "Files", "file"]]],
         ["PROJECTS & WORK", [["projects", "Projects", "folder"], ["project", "Project Details", "briefcase"], ["my-work", "All Tasks", "work"],
             ["task", "Task Details", "list"], ["calendar", "Work Calendar", "calendar"], ["templates", "Workflow Templates", "layers"], ["reports", "Reports", "file"]]],

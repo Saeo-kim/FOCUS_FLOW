@@ -68,5 +68,11 @@ public class OrgPosition {
     public String getMission() { return mission; }
     public String getStatus() { return status; }
     public Long getAssigneeUserId() { return assigneeUserId; }
+
+    /** Assigns a person, or clears the assignment (null). Only the position service calls this, after its checks. */
+    public void assign(Long userId) {
+        this.assigneeUserId = userId;
+        this.status = userId == null ? "VACANT" : "FILLED";
+    }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }
