@@ -175,10 +175,12 @@ function priorityOptions() {
     return [["HIGH", "High"], ["MEDIUM", "Medium"], ["LOW", "Low"]].map(([v, l]) => h("option", { value: v }, l));
 }
 
-function openModal(content) {
+function openModal(content, { wide = false } = {}) {
     const modal = document.getElementById("modal");
+    modal.classList.toggle("wide", wide);
     modal.replaceChildren(content);
     if (!modal.open) modal.showModal();
+    modal.scrollTop = 0; // focusing the first button would otherwise scroll a long dialog to its bottom
 }
 
 const closeModal = () => document.getElementById("modal").close();

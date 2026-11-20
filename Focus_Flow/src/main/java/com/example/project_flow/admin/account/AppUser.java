@@ -70,6 +70,10 @@ public class AppUser {
     @Column(length = 30)
     private Department department;
 
+    /** What this person is responsible for, one item per line. Null on older rows and on AI seats (their catalog lists theirs). */
+    @Column(columnDefinition = "TEXT")
+    private String responsibilities;
+
     /** One emoji or up to two letters shown in the avatar circle. Null shows the first letter of the name. */
     @Column(length = 16)
     private String avatar;
@@ -100,6 +104,10 @@ public class AppUser {
         this.kind = kind;
         this.title = title;
         this.department = department;
+    }
+
+    public void assignResponsibilities(String responsibilities) {
+        this.responsibilities = responsibilities;
     }
 
     /**
@@ -156,6 +164,7 @@ public class AppUser {
     public AccountKind getKind() { return kind == null ? AccountKind.HUMAN : kind; }
     public String getTitle() { return title; }
     public Department getDepartment() { return department; }
+    public String getResponsibilities() { return responsibilities; }
     public String getAvatar() { return avatar; }
     public String getAvatarColor() { return avatarColor; }
 }
