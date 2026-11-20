@@ -8,6 +8,7 @@ import java.time.LocalDate;
  * @param type      TASK_DUE, TASK_SCHEDULED or PROJECT_DUE
  * @param priority  null for project entries
  * @param taskId    null for project entries
+ * @param category  deadline category name (for example PRESENTATION); null for other entries
  */
 public record CalendarEntryResponse(
         String type,
@@ -18,5 +19,6 @@ public record CalendarEntryResponse(
         boolean done,
         Long taskId,
         Long projectId,
-        String projectName) {
+        String projectName,
+        String category) {
 }

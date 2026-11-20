@@ -9,14 +9,14 @@ import java.util.Map;
 public final class AiRequestKinds {
 
     public static final Map<String, String> CFO = Map.of(
-            "monthly_report", "월간 재무 보고서",
-            "financial_analysis", "사업 손익 분석",
-            "cash_flow", "현금흐름·자금 소진 점검",
-            "bookkeeping", "장부 정리 현황",
-            "tax_summary", "세무 준비 자료",
-            "portfolio", "투자 자산 현황",
-            "planning", "재무 계획·권고",
-            "risk_audit", "재무 위험 점검");
+            "monthly_report", "Monthly financial report",
+            "financial_analysis", "Business profit and loss analysis",
+            "cash_flow", "Cash flow and runway check",
+            "bookkeeping", "Bookkeeping status",
+            "tax_summary", "Tax preparation material",
+            "portfolio", "Investment account summary",
+            "planning", "Financial planning and recommendations",
+            "risk_audit", "Financial risk review");
 
     private AiRequestKinds() {
     }
