@@ -163,6 +163,7 @@ public class AccountService {
         AppUser user = new AppUser(username, request.displayName().trim(), unusableHash(), role, LocalDateTime.now(clock));
         user.changeEmail(email);
         user.assignJob(request.kind() == null ? AccountKind.HUMAN : request.kind(), References.clean(request.title()), request.department());
+        user.assignResponsibilities(References.clean(request.responsibilities()));
         users.save(user);
         activity.record("ACCOUNT_INVITED", "Invited " + user.getDisplayName() + " (@" + username + ") as " + (role == UserRole.ADMIN ? "administrator" : "member"));
         return issue(user, true);
@@ -203,6 +204,9 @@ public class AccountService {
         }
         AccountKind kind = user.isAi() ? AccountKind.AI : request.kind() == null ? user.getKind() : request.kind();
         user.assignJob(kind, References.clean(request.title()), request.department());
+        if (request.responsibilities() != null) {
+            user.assignResponsibilities(References.clean(request.responsibilities()));
+        }
         if (request.active() != null && request.active() != user.isActive()) {
             activity.record(request.active() ? "ACCOUNT_REACTIVATED" : "ACCOUNT_DEACTIVATED",
                     (request.active() ? "Reactivated " : "Deactivated ") + user.getDisplayName() + " (@" + user.getUsername() + ")");

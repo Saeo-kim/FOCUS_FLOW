@@ -15,6 +15,8 @@ public final class AccountDtos {
     private static final String USERNAME = "[A-Za-z0-9._-]{3,40}";
     private static final String COLOR = "#[0-9a-fA-F]{6}";
     private static final String USERNAME_MESSAGE = "Use 3–40 letters, numbers, dots, dashes or underscores for the username.";
+    static final int RESPONSIBILITIES_MAX = 2000;
+    private static final String RESPONSIBILITIES_MESSAGE = "Keep the responsibilities under 2000 characters.";
 
     public record SetupRequest(
             @NotBlank(message = "Enter a username.") @Pattern(regexp = USERNAME, message = USERNAME_MESSAGE) String username,
@@ -52,27 +54,32 @@ public final class AccountDtos {
             UserRole role,
             AccountKind kind,
             @Size(max = 60, message = "Keep the title under 60 characters.") String title,
-            Department department) {
+            Department department,
+            @Size(max = RESPONSIBILITIES_MAX, message = RESPONSIBILITIES_MESSAGE) String responsibilities) {
     }
 
+    /** {@code responsibilities} null means "leave them as they are", so older clients cannot erase them. */
     public record MemberUpdateRequest(
             @NotBlank(message = "Enter the member's name.") @Size(max = 60, message = "Keep the name under 60 characters.") String displayName,
             @Email(message = "Enter a valid email address.") @Size(max = 120, message = "Keep the email under 120 characters.") String email,
             Boolean active,
             AccountKind kind,
             @Size(max = 60, message = "Keep the title under 60 characters.") String title,
-            Department department) {
+            Department department,
+            @Size(max = RESPONSIBILITIES_MAX, message = RESPONSIBILITIES_MESSAGE) String responsibilities) {
     }
 
     public record UserResponse(Long id, String username, String email, String displayName, UserRole role,
                                boolean active, boolean passwordSet, boolean codePending, LocalDateTime codeExpiresAt,
                                LocalDateTime createdAt, LocalDateTime lastLoginAt,
-                               AccountKind kind, String title, Department department, String avatar, String avatarColor) {
+                               AccountKind kind, String title, Department department, String avatar, String avatarColor,
+                               String responsibilities) {
         public static UserResponse from(AppUser user) {
             return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getDisplayName(), user.getRole(),
                     user.isActive(), user.isPasswordSet(), user.hasPendingCode(), user.getInviteExpiresAt(),
                     user.getCreatedAt(), user.getLastLoginAt(),
-                    user.getKind(), user.getTitle(), user.getDepartment(), user.getAvatar(), user.getAvatarColor());
+                    user.getKind(), user.getTitle(), user.getDepartment(), user.getAvatar(), user.getAvatarColor(),
+                    user.getResponsibilities());
         }
     }
 
