@@ -568,6 +568,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .profile-head .row { flex-wrap: wrap; }
 .profile .tag { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
-/* Member rows: job lines wrap inside the card instead of being cut off (table cells default to nowrap) */
-.members-table td { white-space: normal; }
+/* Member rows: the name cell wraps its job line instead of cutting it off; other columns keep their layout */
+.members-table td:first-child { white-space: normal; min-width: 200px; }
 .members-table .person > div { min-width: 0; overflow-wrap: anywhere; }
