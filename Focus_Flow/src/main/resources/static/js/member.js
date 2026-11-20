@@ -474,9 +474,54 @@
 
     const cal = { month: monthKey(new Date()), selected: todayIso() };
 
+    const PERSONAL_CATEGORIES = [["DAILY", "Daily"], ["HEALTH", "Health"], ["FINANCE", "Money"], ["FAMILY", "Family"], ["LEARNING", "Learning"], ["OTHER", "Other"]];
+
+    /** The member's own daily items for one day: only this account's items are ever shown or changed here. */
+    function personalPanel(date, items) {
+        const title = h("input", { type: "text", maxlength: 120, "aria-label": "Item title", placeholder: "e.g. Dentist, pay rent, study 1 hour" });
+        const time = h("input", { type: "time", "aria-label": "Time" });
+        const cat = h("select", { "aria-label": "Category" }, PERSONAL_CATEGORIES.map(([v, l]) => h("option", { value: v }, l)));
+        const note = h("input", { type: "text", maxlength: 1000, "aria-label": "Note", placeholder: "Note (optional)" });
+        const add = h("button", { class: "btn primary", type: "button", onclick: async () => {
+            if (!title.value.trim()) { toast("Give the item a title.", true); title.focus(); return; }
+            try {
+                await call("/api/member/personal-events", { method: "POST", body: {
+                    title: title.value.trim(), eventDate: date, startTime: time.value || null, category: cat.value, note: note.value.trim() || null,
+                } });
+                toast("Added to your calendar.");
+                refresh();
+            } catch (error) { toast(error.message, true); }
+        } }, icon("plus", 16), "Add");
+        const rows = items.map(i => h("li", { class: i.done ? "done" : "" },
+            h("label", { class: "personal-check" },
+                h("input", { type: "checkbox", checked: i.done ? true : null, "aria-label": `Done: ${i.title}`, onchange: async (e) => {
+                    try {
+                        await call(`/api/member/personal-events/${i.id}`, { method: "PUT", body: {
+                            title: i.title, eventDate: i.eventDate, startTime: i.startTime || null, category: i.category, note: i.note || null, done: e.target.checked,
+                        } });
+                        refresh();
+                    } catch (error) { toast(error.message, true); }
+                } }),
+                h("strong", null, i.title), i.startTime ? ` · ${i.startTime.slice(0, 5)}` : "",
+                i.note ? h("div", { class: "muted small" }, i.note) : null),
+            h("button", { class: "icon-btn", type: "button", "aria-label": `Delete ${i.title}`, onclick: async () => {
+                if (!window.confirm(`Delete "${i.title}" from your calendar?`)) return;
+                try { await call(`/api/member/personal-events/${i.id}`, { method: "DELETE" }); refresh(); }
+                catch (error) { toast(error.message, true); }
+            } }, icon("trash", 16))));
+        return h("section", { class: "personal" },
+            h("h3", { class: "ai-subhead" }, "My daily items"),
+            rows.length ? h("ul", { class: "personal-list" }, rows) : h("p", { class: "muted small" }, "Nothing added for this day yet."),
+            h("div", { class: "personal-form" }, title, time, cat, note, add));
+    }
+
     async function viewCalendar() {
-        const entries = await call(`/api/member/calendar?month=${cal.month}`);
+        const [entries, personal] = await Promise.all([
+            call(`/api/member/calendar?month=${cal.month}`),
+            call(`/api/member/personal-events?month=${cal.month}`),
+        ]);
         const byDate = groupByDate(entries);
+        const personalByDate = personal.reduce((map, item) => { (map[item.eventDate] ||= []).push(item); return map; }, {});
         const today = todayIso();
         const shift = delta => {
             cal.month = shiftMonth(cal.month, delta);
@@ -492,11 +537,13 @@
                     h("button", { class: "btn", type: "button", onclick: () => { cal.month = monthKey(new Date()); cal.selected = todayIso(); refresh(); } }, "Today")),
                 h("div", { class: "cal-grid" }, weekdayHeads(), monthCells(cal.month, (date, day) => {
                     const list = byDate.get(date) || [];
+                    const mine = personalByDate[date] || [];
                     return h("button", {
                         class: `cal-day${date === today ? " today" : ""}${date === cal.selected ? " selected" : ""}`, type: "button",
                         "aria-label": `${fmtDateLong(date)}, ${list.length} items`, "aria-pressed": String(date === cal.selected),
                         onclick: () => { cal.selected = date; refresh(); },
                     }, h("span", { class: "cal-num" }, day), list.slice(0, 3).map(e => h("span", { class: chipClass(e) }, e.title)),
+                        mine.slice(0, 2).map(i => h("span", { class: "chip personal" + (i.done ? " done" : "") }, i.title)),
                         list.length > 3 && h("span", { class: "chip-more" }, `+${list.length - 3} more`));
                 })),
                 h("div", { class: "legend" },
@@ -504,11 +551,13 @@
                     h("span", { class: "chip team" }, "Team deadline"), h("span", { class: "chip phase" }, "Phase"), h("span", { class: "chip project" }, "Project end"))),
             h("div", { class: "card" },
                 h("div", { class: "section-heading" }, h("h2", null, fmtDateLong(cal.selected))),
+                h("h3", { class: "ai-subhead" }, "Team and project items"),
                 selected.length ? h("div", { class: "entry-list" }, selected.map(e => h("button", { class: "entry" + (e.done ? " done" : ""), type: "button", onclick: () => open(e) },
                     h("div", { class: "entry-title" }, e.title),
                     h("div", { class: "task-meta" }, h("span", { class: "tag " + (ENTRY_TAG[e.type] || "") }, ENTRY_LABEL[e.type]),
                         e.done && h("span", { class: "tag green" }, "Done"), e.projectName && h("span", { class: "tag" }, e.projectName)))))
-                    : h("div", { class: "empty" }, "Nothing on this date.")));
+                    : h("div", { class: "empty" }, "Nothing on this date."),
+                personalPanel(cal.selected, personalByDate[cal.selected] || [])));
     }
 
     /* ---------- My Submissions ---------- */

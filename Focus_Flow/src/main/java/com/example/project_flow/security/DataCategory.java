@@ -1,0 +1,6 @@
+package com.example.project_flow.security;
+
+public enum DataCategory {
+    FINANCIAL, CONTRACT, CUSTOMER_PERSONAL, EMPLOYEE_PERSONAL, BUSINESS_PLAN, CREDENTIAL, SOURCE_CODE,
+    INTELLECTUAL_PROPERTY, GENERAL
+}

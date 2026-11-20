@@ -3,6 +3,9 @@ package com.example.project_flow.admin.web;
 import com.example.project_flow.admin.account.AccountService;
 import com.example.project_flow.admin.account.AppUser;
 import com.example.project_flow.admin.account.UserRole;
+import com.example.project_flow.legal.web.LegalIntegrationController;
+import com.example.project_flow.security.web.SecurityIntegrationController;
+import org.springframework.web.method.HandlerMethod;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -49,6 +52,12 @@ public class AuthInterceptor implements HandlerInterceptor {
             return reject(response, HttpServletResponse.SC_FORBIDDEN, "This request was blocked. Reload the page and try again.");
         }
         if (PUBLIC_PATHS.contains(path)) {
+            return true;
+        }
+        // Only the Legal integration handlers skip the session check. They authenticate with their own
+        // service token, and nothing else is exempted: matching is on the resolved handler, not the URL text.
+        if (handler instanceof HandlerMethod handlerMethod && (handlerMethod.getBeanType() == LegalIntegrationController.class
+                || handlerMethod.getBeanType() == SecurityIntegrationController.class)) {
             return true;
         }
         AppUser user = accounts.activeUser(UserSession.userId(request)).orElse(null);

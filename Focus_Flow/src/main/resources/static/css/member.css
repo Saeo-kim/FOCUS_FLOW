@@ -63,3 +63,15 @@ a.link-card:hover { text-decoration: none; border-color: var(--accent); }
     .sub-when { display: none; }
     .inline-field select { width: 100%; }
 }
+
+/* Personal daily items on the member calendar */
+.chip.personal { background: #e8f7ee; color: #14623a; }
+.chip.personal.done { text-decoration: line-through; opacity: .7; }
+.personal { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 10px; }
+.personal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.personal-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.personal-list li.done strong { text-decoration: line-through; opacity: .65; }
+.personal-check { display: flex; gap: 8px; align-items: flex-start; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.personal-form { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.personal-form input[type="text"]:first-child { grid-column: 1 / -1; }
+@media (max-width: 640px) { .personal-form { grid-template-columns: 1fr; } }

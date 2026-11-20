@@ -223,7 +223,7 @@
     }
 
     async function viewAdmin() {
-        const [dash, projects, work] = await Promise.all([adminApi("/api/admin/dashboard"), api("/api/projects"), loadWork()]);
+        const [dash, projects, work, legal] = await Promise.all([adminApi("/api/admin/dashboard"), api("/api/projects"), loadWork(), adminApi("/api/admin/legal/summary")]);
         const user = await FF.ready();
         const { tasks, users } = work;
         const open = tasks.filter(t => !t.done);
@@ -274,6 +274,12 @@
                 metric(String(dash.rejected), "REJECTED", "Waiting for a new version"),
                 metric(String(dash.approved), "APPROVED", `${covered} of ${dash.phases.length} phases approved`),
                 metric(String(missing.length), "NOT SUBMITTED", currentPhases.length ? `For ${currentPhases.map(p => p.phaseName).join(", ")}` : "No phase running now")),
+            h("div", { class: "detail-group overview-group" }, "Legal & Compliance"),
+            h("section", { class: "metric-grid" },
+                metric(String(legal.pendingReviews), "PENDING REVIEWS", legal.pendingReviews ? "Documents waiting for a decision" : "Nothing waiting"),
+                metric(String(legal.highPriorityRisks), "HIGH-PRIORITY RISKS", legal.highPriorityRisks ? "Open reviews with a HIGH finding" : "No high risks open"),
+                metric(String(legal.completedReviews), "COMPLETED", legal.overdueReviews ? `${legal.overdueReviews} past deadline` : "Reviews closed"),
+                h("a", { class: "metric legal-link", href: "#/legal" }, h("div", { class: "metric-value" }, "Open"), h("div", { class: "metric-label" }, "LEGAL & COMPLIANCE"), h("div", { class: "muted small" }, "Review documents before accepting"))),
 
             h("section", { class: "two-col" },
                 h("div", { class: "card" },
@@ -798,6 +804,8 @@
         files: ["Files", "file", viewFiles],
         "admin-account": ["Account", "user", () => FF.viewAccount()],
         "ai-team": ["AI Team", "briefcase", params => window.AiTeam.view(params)],
+        legal: ["Legal & Compliance", "check", params => window.Legal.view(params)],
+        security: ["AI Security", "activity", () => window.Security.view()],
     };
     Object.assign(ROUTES, ADMIN_ROUTES);
     // The original pages stay as they are; in a company workspace these two read better under clearer names.
@@ -805,7 +813,7 @@
     ROUTES.overview[0] = "Workspace Overview";
 
     FF.buildNav([
-        ["MANAGEMENT", [["admin", "Company Overview", "grid"], ["members", "Members", "users"], ["assignments", "Task Assignment", "target"], ["ai-team", "AI Team", "briefcase"]]],
+        ["MANAGEMENT", [["admin", "Company Overview", "grid"], ["members", "Members", "users"], ["assignments", "Task Assignment", "target"], ["ai-team", "AI Team", "briefcase"], ["legal", "Legal & Compliance", "check"], ["security", "AI Security", "activity"]]],
         ["REVIEW", [["submissions", "Review Queue", "upload"], ["tracker", "Submission Tracker", "check"], ["files", "Files", "file"]]],
         ["PROJECTS & WORK", [["projects", "Projects", "folder"], ["project", "Project Details", "briefcase"], ["my-work", "All Tasks", "work"],
             ["task", "Task Details", "list"], ["calendar", "Work Calendar", "calendar"], ["templates", "Workflow Templates", "layers"], ["reports", "Reports", "file"]]],

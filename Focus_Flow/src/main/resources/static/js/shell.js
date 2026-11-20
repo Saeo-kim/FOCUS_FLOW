@@ -35,6 +35,7 @@ const FF = (() => {
         LEGAL_COMPLIANCE: "Legal & Compliance",
         PEOPLE_HR: "People & HR",
         LEARNING_CAREER: "Learning & Career",
+        INFORMATION_SECURITY: "Information Security & Audit",
     };
     /** Suggested titles per department; the title field still accepts anything. */
     const TITLES = {

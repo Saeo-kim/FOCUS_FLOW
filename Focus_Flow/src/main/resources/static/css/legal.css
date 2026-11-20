@@ -1,0 +1,24 @@
+/* Legal & Compliance page. Uses the tokens from app.css. */
+.legal-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.legal-head h2 { margin: 4px 0 2px; }
+.legal-korean { color: var(--text-2); font-size: 14px; }
+.legal-mission { line-height: 1.6; margin: 12px 0 4px; }
+.legal-functions { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.legal-function { display: flex; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--surface-2); }
+.legal-num { font-weight: 700; color: var(--accent-text); font-size: 13px; padding-top: 2px; }
+.legal-stats { margin: 0; }
+.legal-table tr.legal-row { cursor: pointer; }
+.legal-table tr.legal-row:hover, .legal-table tr.selected { background: var(--accent-soft); }
+.legal-finding { border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: grid; gap: 8px; margin-bottom: 10px; }
+.legal-decision { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.legal-decision-body { display: grid; gap: 10px; }
+.legal-desc { white-space: pre-wrap; line-height: 1.55; }
+.row.between { justify-content: space-between; }
+.legal-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .legal-stats { grid-template-columns: 1fr; } }
+.legal-owner { display: grid; gap: 10px; }
+/* Phone widths: let review table cells wrap instead of cutting text off. */
+@media (max-width: 640px) {
+    .legal-table { min-width: 560px; }
+    .legal-table th, .legal-table td { white-space: normal; vertical-align: top; }
+}

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Install FOCUS FLOW</title>
+    <meta name="theme-color" content="#1A1950">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/login.css">
+    <style>
+        .install-wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+        .install-wrap h1 { font-size: 26px; margin: 8px 0 6px; }
+        .install-wrap h2 { font-size: 18px; margin: 26px 0 8px; }
+        .install-wrap ol { padding-left: 20px; line-height: 1.7; }
+        .install-note { background: #f0ecff; border-radius: 12px; padding: 12px 14px; color: #3b2a8f; margin: 14px 0; }
+        .install-wrap a { color: #4f2fd6; }
+    </style>
+</head>
+<body>
+<main class="install-wrap">
+    <a href="/login">&larr; Back to sign in</a>
+    <h1>Install FOCUS FLOW</h1>
+    <p>Install FOCUS FLOW so it opens in its own window from your desktop, Start menu, or home screen. It uses the same account and the same data as the browser version.</p>
+    <p class="install-note">Installation needs the app to be opened over HTTPS (or on <code>localhost</code>). Sign in first, then follow the steps for your device.</p>
+
+    <h2>Chrome (Windows, Mac, Linux, Android)</h2>
+    <ol>
+        <li>Open the FOCUS FLOW address in Chrome and sign in.</li>
+        <li>Click the install icon at the right end of the address bar, or open the menu (&#8942;) and choose <strong>Install FOCUS FLOW</strong>.</li>
+        <li>Confirm with <strong>Install</strong>. The app opens in its own window and can be pinned to the taskbar or home screen.</li>
+    </ol>
+
+    <h2>Microsoft Edge (Windows, Mac)</h2>
+    <ol>
+        <li>Open the FOCUS FLOW address in Edge and sign in.</li>
+        <li>Open the menu (&hellip;) and choose <strong>Apps</strong>, then <strong>Install this site as an app</strong>.</li>
+        <li>Confirm with <strong>Install</strong>. Edge adds FOCUS FLOW to the Start menu and taskbar.</li>
+    </ol>
+
+    <h2>iPhone and iPad (Safari)</h2>
+    <p>Installing on iOS works only from Safari, not from other iPhone browsers.</p>
+    <ol>
+        <li>Open the FOCUS FLOW address in <strong>Safari</strong> and sign in.</li>
+        <li>Tap the <strong>Share</strong> button (square with an arrow).</li>
+        <li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+    </ol>
+
+    <h2>If the install option does not appear</h2>
+    <ul>
+        <li>Check that the address starts with <code>https://</code>.</li>
+        <li>Reload the page once, sign in, and try again. The browser offers installation after the app's service worker is active.</li>
+        <li>Private or incognito windows usually do not offer installation.</li>
+    </ul>
+</main>
+<script src="/js/pwa.js"></script>
+</body>
+</html>
