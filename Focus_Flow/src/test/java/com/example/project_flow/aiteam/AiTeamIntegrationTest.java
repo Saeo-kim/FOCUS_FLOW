@@ -155,7 +155,7 @@ class AiTeamIntegrationTest {
         assertNotNull(asked.aiRequestId());
         AiRequest request = requests.findById(asked.aiRequestId()).orElseThrow();
         assertEquals(asked.id(), request.getCommentId());
-        assertEquals("댓글 요청: 세금 준비 점검", request.getTitle());
+        assertEquals("Comment request: 세금 준비 점검", request.getTitle());
 
         OFFICE.complete(request.getOfficeTaskId(), "세무 준비 자료 (2026): 사업 매출 0원",
                 Map.of("kind", "tax_summary", "limitations", List.of("세무사 검토 필요")));

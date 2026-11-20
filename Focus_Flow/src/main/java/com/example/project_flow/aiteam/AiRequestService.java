@@ -139,7 +139,7 @@ public class AiRequestService {
     @Transactional
     public Optional<AiRequest> onMention(AppUser author, TaskComment comment, String taskTitle) {
         if (team.activeSeat("cfo").isEmpty()) return Optional.empty();
-        return Optional.of(ask(author, comment.getTaskId(), "cfo", null, "댓글 요청: " + taskTitle, comment.getBody(), comment.getId()));
+        return Optional.of(ask(author, comment.getTaskId(), "cfo", null, "Comment request: " + taskTitle, comment.getBody(), comment.getId()));
     }
 
     /**
@@ -188,7 +188,7 @@ public class AiRequestService {
     private void send(AiRequest request) {
         LocalDateTime now = now();
         if (!office.configured()) {
-            request.sendFailed("Owner's Office 연결 토큰(OWNERS_OFFICE_TOKEN)이 설정되지 않았습니다.", now);
+            request.sendFailed("The Owner's Office connection token (OWNERS_OFFICE_TOKEN) is not set.", now);
             return;
         }
         try {
@@ -210,7 +210,7 @@ public class AiRequestService {
             request.completed(report.kind(), report.summary(), writeJson(report.result()), now);
             onCompleted(request, report);
         } else if (next == AiRequestStatus.FAILED && request.getStatus() != AiRequestStatus.FAILED) {
-            request.failed(report.error() == null ? "처리에 실패했습니다." : report.error(), now);
+            request.failed(report.error() == null ? "Processing failed." : report.error(), now);
             onFailed(request);
         } else if (next != AiRequestStatus.COMPLETED && next != AiRequestStatus.FAILED) {
             request.progress(next, now);
@@ -219,7 +219,7 @@ public class AiRequestService {
 
     private void onCompleted(AiRequest request, OfficeTask report) {
         String seatName = seatName(request.getAgentKey());
-        notifications.notifyAdmins("AI_REPORT", seatName + " 보고서: " + request.getTitle(),
+        notifications.notifyAdmins("AI_REPORT", seatName + " report: " + request.getTitle(),
                 report.summary() == null ? "" : report.summary(), "#/ai-team?request=" + request.getId());
         if (request.getTaskId() == null) return;
         tasks.findById(request.getTaskId()).ifPresent(task -> {
@@ -233,7 +233,7 @@ public class AiRequestService {
     private void onFailed(AiRequest request) {
         if (request.getTaskId() == null) return;
         tasks.findById(request.getTaskId()).ifPresent(task -> {
-            postFromTeammate(request, task.getId(), "보고서를 만들지 못했습니다. 입력 내용을 확인한 뒤 다시 요청해 주세요.");
+            postFromTeammate(request, task.getId(), "Could not create the report. Check the request details and try again.");
             taskService.setStatus(task.getId(), WorkStatus.BLOCKED);
         });
     }
@@ -252,8 +252,8 @@ public class AiRequestService {
     private String reportNote(OfficeTask report) {
         StringBuilder out = new StringBuilder();
         if (report.summary() != null) out.append(report.summary());
-        appendList(out, report.result(), "recommendations", "권고", 3);
-        appendList(out, report.result(), "limitations", "한계", 2);
+        appendList(out, report.result(), "recommendations", "Recommendations", 3);
+        appendList(out, report.result(), "limitations", "Limitations", 2);
         String text = out.toString();
         return text.length() > REPORT_NOTE_LIMIT ? text.substring(0, REPORT_NOTE_LIMIT) + "…" : text;
     }
@@ -274,7 +274,7 @@ public class AiRequestService {
 
     private String seatName(String agentKey) {
         return team.activeSeat(agentKey).map(AppUser::getDisplayName)
-                .orElse(catalog.byKey(agentKey).map(AiTeamMember::displayName).orElse("AI 팀원"));
+                .orElse(catalog.byKey(agentKey).map(AiTeamMember::displayName).orElse("AI teammate"));
     }
 
     private static AiRequestStatus toStatus(String officeStatus) {

@@ -90,28 +90,28 @@ public class CalendarService {
         Project project = task.getProject();
         return new CalendarEntryResponse(type, date, task.getTitle(), task.getPriority(),
                 task.getPriority() == Priority.HIGH, task.isDone(), task.getId(),
-                project != null ? project.getId() : null, project != null ? project.getName() : null);
+                project != null ? project.getId() : null, project != null ? project.getName() : null, null);
     }
 
     private static CalendarEntryResponse projectEntry(Project project) {
         return new CalendarEntryResponse("PROJECT_DUE", project.getDueDate(), project.getName(), null, false,
-                project.getStatus() == ProjectStatus.COMPLETED, null, project.getId(), project.getName());
+                project.getStatus() == ProjectStatus.COMPLETED, null, project.getId(), project.getName(), null);
     }
 
     private static CalendarEntryResponse deadlineEntry(Deadline d) {
         String type = d.getScope() == DeadlineScope.TEAM ? "DEADLINE_TEAM" : "DEADLINE_PERSONAL";
         return new CalendarEntryResponse(type, d.getDueDate(), d.getTitle(), null, d.getCategory().isMajor(), d.isDone(),
-                null, d.getProjectId(), d.getProject().getName());
+                null, d.getProjectId(), d.getProject().getName(), d.getCategory().name());
     }
 
     private static CalendarEntryResponse responsibilityEntry(Responsibility r) {
         return new CalendarEntryResponse("RESPONSIBILITY_DUE", r.getDueDate(), r.getTitle(), r.getPriority(),
                 r.getPriority() == Priority.HIGH, r.getStatus() == WorkStatus.COMPLETED,
-                null, r.getProjectId(), r.getProject().getName());
+                null, r.getProjectId(), r.getProject().getName(), null);
     }
 
     private static CalendarEntryResponse phaseEntry(ProjectPhase phase, LocalDate date, String title) {
         return new CalendarEntryResponse("TEAM_PHASE", date, title, null, false, false,
-                null, phase.getProjectId(), phase.getProject().getName());
+                null, phase.getProjectId(), phase.getProject().getName(), null);
     }
 }

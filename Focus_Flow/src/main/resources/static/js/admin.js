@@ -97,7 +97,7 @@
             h("h2", null, "New submission"),
             h("div", { class: "form-grid" },
                 h("label", { class: "field" }, "Project", project),
-                h("label", { class: "field" }, "Phase (회차)", phase),
+                h("label", { class: "field" }, "Phase", phase),
                 h("label", { class: "field full" }, "Title", title),
                 h("label", { class: "field" }, "Submitted by", submitter),
                 h("label", { class: "field" }, "Related task", task),

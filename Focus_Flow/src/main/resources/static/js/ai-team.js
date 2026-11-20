@@ -35,7 +35,7 @@ window.AiTeam = (() => {
         if (value === null || value === undefined) return h("span", { class: "muted" }, "No data");
         if (typeof value === "string") return value || "—";
         if (unit === "%") return `${value}%`;
-        if (unit === "원") return `${Math.round(value).toLocaleString("ko-KR")}원`;
+        if (unit === "KRW" || unit === "원") return `KRW ${Math.round(value).toLocaleString("en-US")}`;
         return `${Number(value).toLocaleString("en-US")}${unit ? " " + unit : ""}`;
     }
 
@@ -163,7 +163,7 @@ window.AiTeam = (() => {
         }
         if (res.breakdown?.length) {
             parts.push(table(["Business", "Revenue", "Business cost", "Profit"], res.breakdown.map(b => [
-                b.name, money(b.revenue, "원"), money(b.cost, "원"), money(b.profit, "원"),
+                b.name, money(b.revenue, "KRW"), money(b.cost, "KRW"), money(b.profit, "KRW"),
             ]), [1, 2, 3]));
         }
         return parts;

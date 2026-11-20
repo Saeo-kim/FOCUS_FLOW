@@ -79,16 +79,16 @@ public class OwnersOfficeClient {
 
     private <T> T call(Supplier<T> request) {
         if (!configured) {
-            throw new OwnersOfficeException("Owner's Office 연결 토큰(OWNERS_OFFICE_TOKEN)이 설정되지 않았습니다.");
+            throw new OwnersOfficeException("The Owner's Office connection token (OWNERS_OFFICE_TOKEN) is not set.");
         }
         try {
             T out = request.get();
-            if (out == null) throw new OwnersOfficeException("Owner's Office가 빈 응답을 보냈습니다.");
+            if (out == null) throw new OwnersOfficeException("Owner's Office sent an empty response.");
             return out;
         } catch (RestClientResponseException e) {
-            throw new OwnersOfficeException("Owner's Office가 요청을 거절했습니다 (HTTP " + e.getStatusCode().value() + ").");
+            throw new OwnersOfficeException("Owner's Office refused the request (HTTP " + e.getStatusCode().value() + ").");
         } catch (RestClientException e) {
-            throw new OwnersOfficeException("Owner's Office에 연결할 수 없습니다. 앱이 실행 중인지 확인하세요.");
+            throw new OwnersOfficeException("Cannot connect to Owner's Office. Check that the app is running.");
         }
     }
 }

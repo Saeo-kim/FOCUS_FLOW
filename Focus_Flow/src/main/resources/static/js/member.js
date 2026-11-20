@@ -124,7 +124,7 @@
             h("h2", null, "Submit work"),
             h("div", { class: "form-grid" },
                 h("label", { class: "field" }, "Project", project),
-                h("label", { class: "field" }, "Phase (회차)", phase),
+                h("label", { class: "field" }, "Phase", phase),
                 h("label", { class: "field full" }, "Related task", task),
                 h("label", { class: "field full" }, "Title", title),
                 h("label", { class: "field full" }, "Note", note),
@@ -472,7 +472,7 @@
 
     /* ---------- Calendar ---------- */
 
-    const cal = { month: monthKey(new Date()), selected: todayIso() };
+    const cal = { month: monthKey(new Date()), selected: todayIso(), presentation: null };
 
     const PERSONAL_CATEGORIES = [["DAILY", "Daily"], ["HEALTH", "Health"], ["FINANCE", "Money"], ["FAMILY", "Family"], ["LEARNING", "Learning"], ["OTHER", "Other"]];
 
@@ -526,38 +526,109 @@
         const shift = delta => {
             cal.month = shiftMonth(cal.month, delta);
             cal.selected = cal.month === monthKey(new Date()) ? todayIso() : `${cal.month}-01`;
+            cal.presentation = null;
             refresh();
         };
         const open = e => { location.hash = e.taskId != null ? `#/task?id=${e.taskId}` : `#/project?id=${e.projectId}`; };
+        const openPresentation = e => { cal.presentation = e; refresh(); };
+
+        // The presentation detail is loaded only when one is opened, so the grid and day list stay short.
+        let detail = null;
+        if (cal.presentation) {
+            try { detail = { data: await presentationDetail(cal.presentation) }; }
+            catch (error) { detail = { error: error.message }; }
+        }
+
         const selected = byDate.get(cal.selected) || [];
         return h("div", { class: "cal-layout" },
             h("div", { class: "card" },
                 h("div", { class: "section-heading" },
                     monthNav(fmtMonth(cal.month), shift),
-                    h("button", { class: "btn", type: "button", onclick: () => { cal.month = monthKey(new Date()); cal.selected = todayIso(); refresh(); } }, "Today")),
+                    h("button", { class: "btn", type: "button", onclick: () => { cal.month = monthKey(new Date()); cal.selected = todayIso(); cal.presentation = null; refresh(); } }, "Today")),
                 h("div", { class: "cal-grid" }, weekdayHeads(), monthCells(cal.month, (date, day) => {
                     const list = byDate.get(date) || [];
-                    const mine = personalByDate[date] || [];
+                    const presentations = list.filter(isPresentation);
+                    const others = [...list.filter(e => !isPresentation(e)), ...(personalByDate[date] || [])];
                     return h("button", {
                         class: `cal-day${date === today ? " today" : ""}${date === cal.selected ? " selected" : ""}`, type: "button",
                         "aria-label": `${fmtDateLong(date)}, ${list.length} items`, "aria-pressed": String(date === cal.selected),
-                        onclick: () => { cal.selected = date; refresh(); },
-                    }, h("span", { class: "cal-num" }, day), list.slice(0, 3).map(e => h("span", { class: chipClass(e) }, e.title)),
-                        mine.slice(0, 2).map(i => h("span", { class: "chip personal" + (i.done ? " done" : "") }, i.title)),
-                        list.length > 3 && h("span", { class: "chip-more" }, `+${list.length - 3} more`));
+                        onclick: () => { cal.selected = date; cal.presentation = null; refresh(); },
+                    }, h("span", { class: "cal-num" }, day),
+                        presentations.map(e => h("span", {
+                            class: "chip team presentation-chip", role: "button", tabindex: "0", title: "Open presentation",
+                            onclick: ev => { ev.stopPropagation(); openPresentation(e); },
+                            onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); openPresentation(e); } },
+                        }, "Presentation")),
+                        others.length ? h("span", { class: "dots" }, others.slice(0, 5).map(e => h("span", { class: "dot" + (e.important ? " important" : "") }))) : null);
                 })),
                 h("div", { class: "legend" },
-                    h("span", { class: "chip due" }, "My deadline"), h("span", { class: "chip sched" }, "Scheduled"),
-                    h("span", { class: "chip team" }, "Team deadline"), h("span", { class: "chip phase" }, "Phase"), h("span", { class: "chip project" }, "Project end"))),
-            h("div", { class: "card" },
-                h("div", { class: "section-heading" }, h("h2", null, fmtDateLong(cal.selected))),
-                h("h3", { class: "ai-subhead" }, "Team and project items"),
-                selected.length ? h("div", { class: "entry-list" }, selected.map(e => h("button", { class: "entry" + (e.done ? " done" : ""), type: "button", onclick: () => open(e) },
-                    h("div", { class: "entry-title" }, e.title),
-                    h("div", { class: "task-meta" }, h("span", { class: "tag " + (ENTRY_TAG[e.type] || "") }, ENTRY_LABEL[e.type]),
-                        e.done && h("span", { class: "tag green" }, "Done"), e.projectName && h("span", { class: "tag" }, e.projectName)))))
-                    : h("div", { class: "empty" }, "Nothing on this date."),
-                personalPanel(cal.selected, personalByDate[cal.selected] || [])));
+                    h("span", { class: "chip team" }, "Presentation"), h("span", { class: "dot" }), h("span", { class: "muted small" }, "Other items (open a day to see them)"))),
+            cal.presentation
+                ? h("div", { class: "card" }, presentationPanel(cal.presentation, detail?.data, detail?.error))
+                : h("div", { class: "card" },
+                    h("div", { class: "section-heading" }, h("h2", null, fmtDateLong(cal.selected))),
+                    h("h3", { class: "ai-subhead" }, "Team and project items"),
+                    selected.length ? h("div", { class: "entry-list" }, selected.map(e => h("button", { class: "entry" + (e.done ? " done" : ""), type: "button", onclick: () => (isPresentation(e) ? openPresentation(e) : open(e)) },
+                        h("div", { class: "entry-title" }, isPresentation(e) ? "Presentation" : e.title),
+                        h("div", { class: "task-meta" }, h("span", { class: "tag " + (ENTRY_TAG[e.type] || "") }, ENTRY_LABEL[e.type]),
+                            e.done && h("span", { class: "tag green" }, "Done"), e.projectName && h("span", { class: "tag" }, e.projectName)))))
+                        : h("div", { class: "empty" }, "Nothing on this date."),
+                    personalPanel(cal.selected, personalByDate[cal.selected] || [])));
+    }
+
+    /** Presentation events: the grid shows only the label, and the details open here when clicked. */
+    const isPresentation = e => e.category === "PRESENTATION";
+
+    /** The presentation's project, phases, the member's work items and their steps. Called only on click. */
+    async function presentationDetail(entry) {
+        const detail = await call(`/api/member/projects/${entry.projectId}`);
+        const stepLists = await Promise.all(detail.myTasks.map(t => call(`/api/member/tasks/${t.id}`).then(r => r.steps, () => [])));
+        const deadline = detail.teamDeadlines.find(d => d.category === "PRESENTATION" && d.dueDate === entry.date && d.title === entry.title)
+            || detail.teamDeadlines.find(d => d.category === "PRESENTATION" && d.dueDate === entry.date) || null;
+        return { ...detail, deadline, workItems: detail.myTasks.map((task, i) => ({ task, steps: stepLists[i] })) };
+    }
+
+    /** Project name first, then the presentation, its details, related phases, work items and progress. */
+    function presentationPanel(entry, detail, error) {
+        const back = h("button", { class: "btn", type: "button", onclick: () => { cal.presentation = null; refresh(); } }, "Back to the day");
+        if (error || !detail) return h("div", null, back, h("div", { class: "empty" }, error || "Could not load this presentation."));
+        const { project, deadline, phases, workItems } = detail;
+        const isDone = deadline ? deadline.done : entry.done;
+        const doneCount = workItems.filter(w => w.task.done).length;
+        const total = workItems.length;
+        return h("div", { class: "presentation-detail" },
+            back,
+            h("div", { class: "muted small", style: "margin-top:14px" }, "Project"),
+            h("h2", { class: "presentation-project" }, project.name),
+            h("h3", { class: "ai-subhead" }, "Presentation"),
+            h("div", { class: "entry-title" }, deadline ? deadline.title : entry.title),
+            h("div", { class: "task-meta" },
+                h("span", { class: "tag" }, fmtDateLong(entry.date)),
+                h("span", { class: "tag " + (isDone ? "green" : "amber") }, isDone ? "Done" : "Open")),
+            deadline && (deadline.owner || deadline.personalAction || deadline.note) && h("div", { class: "stack tight", style: "margin-top:10px" },
+                deadline.owner && h("div", null, h("strong", null, "Owner: "), deadline.owner),
+                deadline.personalAction && h("div", null, h("strong", null, "Next action: "), deadline.personalAction),
+                deadline.note && h("div", { class: "muted" }, deadline.note)),
+            h("h3", { class: "ai-subhead" }, "Progress"),
+            h("div", { class: "muted small" }, total ? `${doneCount} of ${total} of your work items done` : "You have no work items in this project yet."),
+            total ? progressBar(Math.round(doneCount * 100 / total)) : null,
+            h("h3", { class: "ai-subhead" }, "Project phases"),
+            phases.length
+                ? h("ul", { class: "personal-list" }, phases.map(p => h("li", null, h("strong", null, p.name), ` · ${fmtDate(p.startDate)} – ${fmtDate(p.endDate)}`)))
+                : h("p", { class: "muted small" }, "No phases yet."),
+            h("h3", { class: "ai-subhead" }, "Your work items and steps"),
+            workItems.length
+                ? h("div", { class: "entry-list" }, workItems.map(({ task, steps }) => {
+                    const [label, tone] = WORK_STATUS[task.status] || [task.status, ""];
+                    return h("div", { class: "entry" + (task.done ? " done" : "") },
+                        h("a", { class: "entry-title", href: `#/task?id=${task.id}` }, task.title),
+                        h("div", { class: "task-meta" }, h("span", { class: "tag " + tone }, label), task.done && h("span", { class: "tag green" }, "Done")),
+                        steps.length ? h("ul", { class: "personal-list" }, steps.map(s => {
+                            const [stepLabel] = WORK_STATUS[s.status] || [s.status];
+                            return h("li", { class: s.status === "COMPLETED" ? "done" : "" }, `${s.title} · ${stepLabel}`);
+                        })) : null);
+                }))
+                : h("div", { class: "empty" }, "No work items for this project yet."));
     }
 
     /* ---------- My Submissions ---------- */

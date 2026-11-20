@@ -25,7 +25,7 @@ public class LegalCatalog {
     private static final Position LEGAL_LEAD = new Position(
             LEAD,
             "Legal & Compliance Lead",
-            "법률·준법 총괄 책임자",
+            "Chief legal and compliance officer",
             Department.LEGAL_COMPLIANCE,
             "Protect the owner and the organization from unfavorable agreements, hidden obligations, privacy risks, "
                     + "legal exposure, and regulatory compliance issues. Review agreements, consent forms, service terms, "
