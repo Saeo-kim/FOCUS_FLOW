@@ -397,25 +397,41 @@
         const fill = () => options.replaceChildren(...(FF.TITLES[department.value] || Object.values(FF.TITLES).flat()).map(t => h("option", { value: t })));
         department.addEventListener("change", fill);
         fill();
-        const duties = h("textarea", { rows: 5, maxlength: 2000, "aria-label": "Main responsibilities", placeholder: "One responsibility per line" });
-        duties.value = u.responsibilities || "";
-        const suggest = h("button", {
-            class: "btn", type: "button",
-            onclick: () => {
-                const found = suggestionsFor(title.value);
-                if (!found) { toast("No suggestions for this title yet. Type the responsibilities, one per line.", true); return; }
-                duties.value = found.join("\n");
-            },
-        }, "Suggest from title");
+        // An AI teammate's responsibilities come from the AI team catalog, so only people get the field here.
+        const isAi = u.kind === "AI";
+        let duties = null;
+        let dutiesField = null;
+        if (!isAi) {
+            duties = h("textarea", { rows: 5, maxlength: 2000, "aria-label": "Main responsibilities", placeholder: "One responsibility per line" });
+            duties.value = u.responsibilities || "";
+            const suggest = h("button", {
+                class: "btn", type: "button",
+                onclick: () => {
+                    const found = suggestionsFor(title.value);
+                    if (!found) { toast("No suggestions for this title yet. Type the responsibilities, one per line.", true); return; }
+                    duties.value = found.join("\n");
+                },
+            }, "Suggest from title");
+            dutiesField = h("div", { class: "field full" },
+                h("span", null, "Main responsibilities"),
+                duties,
+                h("div", { class: "row between" }, h("span", { class: "muted hint" }, "What this person is accountable for. One item per line."), suggest));
+        }
+        const aiNote = isAi && h("p", { class: "muted small full", style: "grid-column: 1 / -1; margin: 0" },
+            "This AI teammate's responsibilities come from the AI team catalog and are not edited here.");
         return [[
             h("label", { class: "field full" }, "Seat", kind),
             h("label", { class: "field" }, "Department", department),
             h("label", { class: "field" }, "Title", title, options),
-            h("div", { class: "field full" },
-                h("span", null, "Main responsibilities"),
-                duties,
-                h("div", { class: "row between" }, h("span", { class: "muted hint" }, "What this person is accountable for. One item per line."), suggest)),
-        ], () => ({ kind: kind.value, department: department.value || null, title: title.value.trim() || null, responsibilities: duties.value })];
+            dutiesField,
+            aiNote,
+        ].filter(Boolean), () => ({
+            kind: kind.value,
+            department: department.value || null,
+            title: title.value.trim() || null,
+            // Left out for AI seats, so the server keeps their current value.
+            ...(duties ? { responsibilities: duties.value } : {}),
+        })];
     }
 
     /** Starting points for "Main responsibilities", matched by part of the job title. The admin edits them per person. */

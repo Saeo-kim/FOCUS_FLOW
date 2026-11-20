@@ -56,7 +56,7 @@ const FF = (() => {
         const text = user?.avatar || initial(user?.displayName || "?");
         return h("span", {
             class: "avatar" + (user?.kind === "AI" ? " ai" : ""),
-            style: `width:${size}px;height:${size}px;font-size:${Math.round(size * (user?.avatar ? 0.55 : 0.42))}px;` + (user?.avatarColor ? `background:${user.avatarColor};` : ""),
+            style: `width:${size}px;height:${size}px;font-size:${Math.round(size * (text.length > 2 ? 0.34 : user?.avatar ? 0.55 : 0.42))}px;` + (user?.avatarColor ? `background:${user.avatarColor};` : ""),
             "aria-hidden": "true",
         }, text);
     }
