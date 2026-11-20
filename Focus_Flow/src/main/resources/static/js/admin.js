@@ -397,11 +397,59 @@
         const fill = () => options.replaceChildren(...(FF.TITLES[department.value] || Object.values(FF.TITLES).flat()).map(t => h("option", { value: t })));
         department.addEventListener("change", fill);
         fill();
+        // An AI teammate's responsibilities come from the AI team catalog, so only people get the field here.
+        const isAi = u.kind === "AI";
+        let duties = null;
+        let dutiesField = null;
+        if (!isAi) {
+            duties = h("textarea", { rows: 5, maxlength: 2000, "aria-label": "Main responsibilities", placeholder: "One responsibility per line" });
+            duties.value = u.responsibilities || "";
+            const suggest = h("button", {
+                class: "btn", type: "button",
+                onclick: () => {
+                    const found = suggestionsFor(title.value);
+                    if (!found) { toast("No suggestions for this title yet. Type the responsibilities, one per line.", true); return; }
+                    duties.value = found.join("\n");
+                },
+            }, "Suggest from title");
+            dutiesField = h("div", { class: "field full" },
+                h("span", null, "Main responsibilities"),
+                duties,
+                h("div", { class: "row between" }, h("span", { class: "muted hint" }, "What this person is accountable for. One item per line."), suggest));
+        }
+        const aiNote = isAi && h("p", { class: "muted small full", style: "grid-column: 1 / -1; margin: 0" },
+            "This AI teammate's responsibilities come from the AI team catalog and are not edited here.");
         return [[
             h("label", { class: "field full" }, "Seat", kind),
             h("label", { class: "field" }, "Department", department),
             h("label", { class: "field" }, "Title", title, options),
-        ], () => ({ kind: kind.value, department: department.value || null, title: title.value.trim() || null })];
+            dutiesField,
+            aiNote,
+        ].filter(Boolean), () => ({
+            kind: kind.value,
+            department: department.value || null,
+            title: title.value.trim() || null,
+            // Left out for AI seats, so the server keeps their current value.
+            ...(duties ? { responsibilities: duties.value } : {}),
+        })];
+    }
+
+    /** Starting points for "Main responsibilities", matched by part of the job title. The admin edits them per person. */
+    const SUGGESTED_RESPONSIBILITIES = {
+        "Knowledge Manager": [
+            "Maintain project documentation",
+            "Record development decisions and progress",
+            "Organize technical knowledge",
+            "Track bugs and proposed improvements",
+            "Review whether documentation matches the actual code",
+            "Prepare completed documentation for README publication",
+        ],
+    };
+
+    function suggestionsFor(title) {
+        const text = (title || "").toLowerCase();
+        const key = Object.keys(SUGGESTED_RESPONSIBILITIES).find(k => text.includes(k.toLowerCase()));
+        return key ? SUGGESTED_RESPONSIBILITIES[key] : null;
     }
 
     function openInviteDialog() {
@@ -415,6 +463,8 @@
                 event.preventDefault();
                 try {
                     const issued = await adminApi("/api/admin/users", { method: "POST", body: { displayName: displayName.value, username: username.value, email: email.value || null, role: role.value, ...readJob() } });
+                    // The member is saved now, so the list shows them even if the code dialog is dismissed another way.
+                    refresh();
                     showCode("Invitation created", issued);
                 } catch (error) { toast(error.message, true); }
             },
@@ -450,6 +500,75 @@
                 ...job,
                 h("label", { class: "field full check-field" }, active, u.id === me.id ? "Active (you can't deactivate yourself)" : "Active — can sign in")),
             h("div", { class: "modal-actions" }, cancelButton(), h("button", { class: "btn primary", type: "submit" }, "Save"))));
+    }
+
+    /**
+     * Member profile: what this person does and what they are responsible for right now. Uses the
+     * data the Members page already loads, plus the activity feed and, for AI seats, the AI team
+     * catalog and their work requests.
+     */
+    async function openMemberProfile(u, { tasks, projects, memberships, me }) {
+        let team = [];
+        let requests = [];
+        let activity = [];
+        try {
+            [team, requests, activity] = await Promise.all([
+                u.kind === "AI" ? adminApi("/api/admin/ai/team") : [],
+                u.kind === "AI" ? adminApi("/api/admin/ai/requests?agent=cfo") : [],
+                api("/api/activity?limit=200"),
+            ]);
+        } catch (error) { toast(error.message, true); return; }
+
+        const seat = team.find(m => m.username === u.username || m.displayName === u.displayName);
+        const duties = u.kind === "AI"
+            ? (seat?.responsibilities || [])
+            : (u.responsibilities || "").split("\n").map(s => s.trim()).filter(Boolean);
+        const assigned = tasks.filter(t => t.assignee?.id === u.id);
+        const open = assigned.filter(t => !t.done).sort((a, b) => (a.dueDate || "9999") < (b.dueDate || "9999") ? -1 : 1);
+        const late = open.filter(isOverdue).length;
+        const finished = assigned.length - open.length;
+        const projectNames = projects.filter(p => memberships.get(p.id)?.includes(u.id) || assigned.some(t => t.projectId === p.id)).map(p => p.name);
+        const projectName = id => projects.find(p => p.id === id)?.name;
+        const mentions = activity.filter(a => a.message.includes(`(@${u.username})`) || a.message.includes(u.displayName)).slice(0, 8);
+        const [state, tone] = accountState(u);
+        const row = (label, value) => h("div", { class: "detail-row" }, h("dt", null, label), h("dd", null, value));
+        const section = (title, body) => h("section", { class: "profile-section" }, h("h3", { class: "detail-group" }, title), body);
+        const list = (items, empty) => items.length ? h("ul", { class: "profile-list" }, items) : h("p", { class: "muted small" }, empty);
+
+        openModal(h("div", { class: "profile" },
+            h("div", { class: "profile-head" },
+                FF.avatar(u, 56),
+                h("div", { class: "min0" },
+                    h("h2", { class: "profile-name" }, u.displayName),
+                    h("div", { class: "muted" }, `@${u.username}${u.email ? " · " + u.email : ""}`),
+                    h("div", { class: "row tight" }, ...FF.roleTags(u), h("span", { class: "tag " + tone }, state),
+                        u.department && h("span", { class: "tag gray" }, FF.DEPARTMENTS[u.department]),
+                        u.title && h("span", { class: "tag gray" }, u.title)))),
+            h("div", { class: "profile-grid" },
+                section(u.kind === "AI" ? "Responsibilities (AI seat)" : "Main responsibilities",
+                    list(duties.map(d => h("li", null, d)),
+                        "No responsibilities recorded yet. Use Edit to add them, or Suggest from title for a starting list.")),
+                section("Current status", h("div", null,
+                    row("Seat", u.kind === "AI" ? "AI teammate" : "Person"),
+                    row("Open tasks", `${open.length}${late ? ` (${late} overdue)` : ""}`),
+                    row("Finished tasks", String(finished)),
+                    row("Projects", projectNames.join(", ") || "—"),
+                    row("Last sign-in", u.lastLoginAt ? ago(u.lastLoginAt) : "Never")))),
+            section("Assigned work", open.length
+                ? h("ul", { class: "profile-list" }, open.slice(0, 12).map(t => h("li", null,
+                    h("a", { href: `#/task?id=${t.id}`, onclick: closeModal }, t.title), " ",
+                    h("span", { class: "tag " + (isOverdue(t) ? "red" : "gray") }, isOverdue(t) ? "Overdue" : (t.status || "Open").replace(/_/g, " ").toLowerCase()),
+                    t.dueDate && h("span", { class: "muted small" }, ` · due ${fmtDate(t.dueDate)}`),
+                    projectName(t.projectId) && h("span", { class: "muted small" }, ` · ${projectName(t.projectId)}`))))
+                : h("p", { class: "muted small" }, "No open tasks assigned.")),
+            u.kind === "AI" && section("Work requests", list(requests.slice(0, 6).map(r => h("li", null, r.title,
+                h("span", { class: "muted small" }, ` · ${(r.status || "").toLowerCase()}`))), "No requests sent yet.")),
+            section("Recent activity", list(mentions.map(a => h("li", null, a.message,
+                h("span", { class: "muted small" }, ` · ${ago(a.createdAt)}`))), "No recent activity mentions this person.")),
+            h("div", { class: "modal-actions" },
+                h("button", { class: "btn", type: "button", onclick: closeModal }, "Close"),
+                h("button", { class: "btn primary", type: "button", onclick: () => { closeModal(); openMemberDialog(u, me); } }, icon("pencil", 16), "Edit"))),
+        { wide: true });
     }
 
     async function openProjectsDialog(u, projects) {
@@ -505,7 +624,7 @@
                     return h("tr", null,
                         h("td", null, h("div", { class: "person" },
                             FF.avatar(u, 30),
-                            h("div", null, h("strong", null, u.displayName), u.id === me.id && h("span", { class: "muted" }, " (you)"),
+                            h("div", null, h("button", { class: "name-link", type: "button", onclick: () => openMemberProfile(u, { tasks, projects, memberships, me }) }, u.displayName), u.id === me.id && h("span", { class: "muted" }, " (you)"),
                                 h("div", { class: "muted" }, "@" + u.username + (u.email ? ` · ${u.email}` : "")),
                                 FF.jobLine(u) && h("div", { class: "muted small" }, FF.jobLine(u))))),
                         h("td", null, h("div", { class: "row tight" }, ...FF.roleTags(u))),
@@ -519,6 +638,7 @@
                             : h("span", { class: "muted" }, "—")),
                         h("td", null, u.lastLoginAt ? ago(u.lastLoginAt) : h("span", { class: "muted" }, "Never")),
                         h("td", null, h("div", { class: "task-actions" },
+                            h("button", { class: "icon-btn", type: "button", title: "Profile", "aria-label": `Profile of ${u.displayName}`, onclick: () => openMemberProfile(u, { tasks, projects, memberships, me }) }, icon("user", 16)),
                             h("button", { class: "icon-btn", type: "button", title: "Edit", "aria-label": `Edit ${u.displayName}`, onclick: () => openMemberDialog(u, me) }, icon("pencil", 16)),
                             h("button", { class: "icon-btn", type: "button", title: "Projects", "aria-label": `Projects of ${u.displayName}`, onclick: () => openProjectsDialog(u, projects) }, icon("folder", 16)),
                             u.id !== me.id && h("button", {
