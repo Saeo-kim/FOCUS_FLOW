@@ -120,7 +120,7 @@ public class NotificationService {
     }
 
     /**
-     * Reads the existing 회차 schedule (never changes it) and adds one reminder per phase that is
+     * Reads the existing phase schedule (never changes it) and adds one reminder per phase that is
      * about to end without an approved submission, or that ended recently with no submission.
      */
     private synchronized void createPhaseReminders() {

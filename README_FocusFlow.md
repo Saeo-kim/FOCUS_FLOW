@@ -209,7 +209,7 @@ In Notepad, enter your MySQL password and port, then save:
 
 The first start builds the application, which takes a few minutes. Open <http://localhost:8080>. The start window also lists the address to use from a phone on the same network.
 
-On an empty database, the first start creates all tables and registers the 부산한끼 project: its schedule, team roles, responsibilities, tasks, deadlines, requirements and workflow template.
+On an empty database, the first start creates all tables and registers the Busan Hankki project: its schedule, team roles, responsibilities, tasks, deadlines, requirements and workflow template.
 
 ### Bring Your Existing Records to Another PC
 

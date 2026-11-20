@@ -12,7 +12,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 /**
- * Work handed in for one schedule phase (회차). Project, phase and task are stored as plain ids,
+ * Work handed in for one schedule phase (phase). Project, phase and task are stored as plain ids,
  * not foreign keys, on purpose: the existing tables gain no constraints, so deleting a phase or
  * task in FOCUS FLOW works exactly as before and the submission simply shows the link as removed.
  */

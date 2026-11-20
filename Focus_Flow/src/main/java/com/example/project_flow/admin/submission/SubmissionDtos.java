@@ -53,7 +53,7 @@ public final class SubmissionDtos {
     public record SubmissionDetail(SubmissionResponse submission, List<FileResponse> files, List<EventResponse> events) {
     }
 
-    /** One row of the 회차 board: what has been handed in for a phase and where it stands. */
+    /** One row of the phase board: what has been handed in for a phase and where it stands. */
     public record PhaseBoardRow(Long phaseId, Long projectId, String projectName, String phaseName,
                                 LocalDate startDate, LocalDate endDate,
                                 int total, int pending, int approved, int rejected,
